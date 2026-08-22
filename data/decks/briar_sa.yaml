@@ -1,0 +1,57 @@
+# Briar, Warden of Thorns — Silver Age
+# Base: lista de Pablo Pintor — "Silver Age Spotlight: Briar" (fev/2026)
+# https://fabtcg.com/articles/silver-age-spotlight-briar/
+#
+# ADAPTADA para a lista de bans vigente (efetiva 03/03/2026):
+#   removidas: Burn Up // Shock x2, Lightning Press x2, Flourish (yellow) x2,
+#              Beckoning Haunt, Bracers of Belief
+#   substitutas: Stinging Sprite x2, Rush of Power x2, Path of Same Ends x2,
+#                Nullrune Boots, Nullrune Hood
+# Obs.: Fyendal's Spring Tunic (da lista original) é ilegal em Silver Age
+#       (nunca impressa em common/rare).
+hero: "Briar, Warden of Thorns"
+format: silver-age
+source: "Pablo Pintor (Spotlight fev/2026), adaptada aos bans de mar/2026"
+
+# Arma + equipamentos disponíveis
+arena:
+  - "Star Fall"
+  - "Blossom of Spring"
+  - "Blade Beckoner Helm"
+  - "Blade Beckoner Boots"
+  - "Helm of Might and Magic"
+  - "Spell Fray Leggings"
+  - "Nullrune Boots"
+  - "Nullrune Hood"
+
+# Pool de deck (47); apresenta exatamente 40 por partida
+deck_pool:
+  # --- ataques 0 custo com Go Again / valor ---
+  - {qty: 2, card: "Ravenous Rabble (red)"}
+  - {qty: 2, card: "Second Strike (red)"}
+  - {qty: 2, card: "Scar for a Scar (red)"}
+  - {qty: 2, card: "Entwine Lightning (red)"}
+  - {qty: 2, card: "Jack Be Nimble (red)"}
+  - {qty: 2, card: "Arcanic Shockwave (red)"}
+  - {qty: 2, card: "Static Shock (red)"}
+  - {qty: 2, card: "Snatch (red)"}
+  # --- não-ataque (habilitam Embodiment of Lightning) ---
+  - {qty: 2, card: "Weave Lightning (red)"}
+  - {qty: 2, card: "Sizzle (red)"}
+  - {qty: 2, card: "Sprout Strength (red)"}
+  - {qty: 2, card: "Nimblism (red)"}
+  - {qty: 2, card: "Bramble Spark (red)"}
+  - {qty: 2, card: "Arcane Seeds // Life (red)"}
+  - {qty: 2, card: "Lightning Surge (red)"}
+  # --- truques e utilitários ---
+  - {qty: 2, card: "Sigil of Suffering (red)"}
+  - {qty: 2, card: "Arcanic Crackle (red)"}
+  - {qty: 1, card: "Cloud Cover (red)"}
+  - {qty: 2, card: "Evergreen (red)"}
+  - {qty: 2, card: "Arcane Polarity (red)"}
+  # --- substitutas dos bans ---
+  - {qty: 2, card: "Stinging Sprite (red)"}
+  - {qty: 2, card: "Rush of Power (red)"}
+  - {qty: 2, card: "Path of Same Ends (yellow)"}
+  # --- azul ---
+  - {qty: 2, card: "Trip the Light Fantastic (blue)"}

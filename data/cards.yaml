@@ -1,0 +1,1171 @@
+# GERADO POR scripts/build_cards.py — não editar à mão.
+# Fonte: the-fab-cube/flesh-and-blood-cards
+
+A Drop in the Ocean (blue):
+  color: blue
+  cost: 0
+  defense: null
+  keywords:
+  - Legendary
+  - Transcend
+  name: A Drop in the Ocean
+  pitch: 3
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Legendary
+
+    Target attack gets -1{p}.
+
+    If you''ve played another blue card this turn, transcend.'
+  types:
+  - Mystic
+  - Instant
+Arcane Polarity (red):
+  color: red
+  cost: 0
+  defense: null
+  keywords: []
+  name: Arcane Polarity
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Gain 1{h}
+
+    If you''ve been dealt arcane damage this turn, instead gain 4{h}.'
+  types:
+  - Generic
+  - Instant
+Arcane Seeds // Life (red):
+  color: red
+  cost: 0
+  defense: 3
+  keywords:
+  - Meld
+  - Go again
+  name: Arcane Seeds // Life
+  pitch: 1
+  power: null
+  rarity: R
+  sa_legal: true
+  text: 'Meld
+
+    Create a Runechant token. Create a Runechant token.
+
+    Go again
+
+    //
+
+    Gain 1{h}'
+  types:
+  - Runeblade
+  - Action
+  - Earth
+  - Instant
+Arcanic Crackle (red):
+  color: red
+  cost: 0
+  defense: 3
+  keywords: []
+  name: Arcanic Crackle
+  pitch: 1
+  power: 3
+  rarity: C
+  sa_legal: true
+  text: Deal 1 arcane damage to target hero.
+  types:
+  - Runeblade
+  - Action
+  - Attack
+Arcanic Shockwave (red):
+  color: red
+  cost: 0
+  defense: 3
+  keywords:
+  - Lightning Fusion
+  name: Arcanic Shockwave
+  pitch: 1
+  power: 4
+  rarity: C
+  sa_legal: true
+  text: 'Lightning Fusion
+
+    When you attack with Arcanic Shockwave, if it was fused, deal 1 arcane damage to target hero.'
+  types:
+  - Elemental
+  - Runeblade
+  - Action
+  - Attack
+Astral Etchings (red):
+  color: red
+  cost: 1
+  defense: 3
+  keywords: []
+  name: Astral Etchings
+  pitch: 1
+  power: null
+  rarity: R
+  sa_legal: true
+  text: 'Put three +1{p} counters on target aura with ward you control.
+
+    If you control a Spectral Shield, you may play this as though it were an instant.'
+  types:
+  - Illusionist
+  - Action
+Big Blue Sky (blue):
+  color: blue
+  cost: 0
+  defense: 2
+  keywords: []
+  name: Big Blue Sky
+  pitch: 3
+  power: null
+  rarity: R
+  sa_legal: true
+  text: This gets +1{d} for each blue card you've pitched this turn.
+  types:
+  - Mystic
+  - Defense Reaction
+Blade Beckoner Boots:
+  color: null
+  cost: null
+  defense: 1
+  keywords:
+  - Guardwell
+  name: Blade Beckoner Boots
+  pitch: null
+  power: null
+  rarity: R
+  sa_legal: true
+  text: 'This gets +1{d} while defending a weapon attack.
+
+    Guardwell'
+  types:
+  - Generic
+  - Equipment
+  - Legs
+Blade Beckoner Helm:
+  color: null
+  cost: null
+  defense: 1
+  keywords:
+  - Guardwell
+  name: Blade Beckoner Helm
+  pitch: null
+  power: null
+  rarity: R
+  sa_legal: true
+  text: 'This gets +1{d} while defending a weapon attack.
+
+    Guardwell'
+  types:
+  - Generic
+  - Equipment
+  - Head
+Blossom of Spring:
+  color: null
+  cost: null
+  defense: 0
+  keywords: []
+  name: Blossom of Spring
+  pitch: null
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Action - Destroy this: Gain {r}. Go again'
+  types:
+  - Generic
+  - Equipment
+  - Chest
+Bramble Spark (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords:
+  - Earth Fusion
+  - Go again
+  name: Bramble Spark
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Earth Fusion
+
+    The next attack action card you play this turn gains "When you attack with this, deal 1 arcane damage
+    to target hero."
+
+    If Bramble Spark was fused, the next attack action card you play this turn gains +3{p}.
+
+    Go again'
+  types:
+  - Elemental
+  - Runeblade
+  - Action
+Briar, Warden of Thorns:
+  color: null
+  cost: null
+  defense: null
+  keywords:
+  - Essence of Earth and Lightning
+  name: Briar, Warden of Thorns
+  pitch: null
+  power: null
+  rarity: T
+  sa_legal: true
+  text: 'Essence of Earth and Lightning
+
+    The first time an attack action card you control deals damage to an opposing hero, create an Embodiment
+    of Earth token.
+
+    Whenever you play your second ''non-attack'' action card each turn, create an Embodiment of Lightning
+    token.'
+  types:
+  - Elemental
+  - Runeblade
+  - Hero
+  - Young
+Cloud Cover (red):
+  color: red
+  cost: 0
+  defense: null
+  keywords: []
+  name: Cloud Cover
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: The next time you would be dealt damage this turn, prevent 3 of that damage.
+  types:
+  - Lightning
+  - Instant
+Cosmo, Scroll of Ancestral Tapestry:
+  color: null
+  cost: null
+  defense: null
+  keywords: []
+  name: Cosmo, Scroll of Ancestral Tapestry
+  pitch: null
+  power: null
+  rarity: T
+  sa_legal: true
+  text: 'During your turn, auras you control with ward are weapons with base {p} equal to their ward and
+    Once per Turn Action - {r}: Attack
+
+    Your aura attacks with one or more +1{p} counters get go again.'
+  types:
+  - Illusionist
+  - Weapon
+  - Scroll
+  - 2H
+Embodiment of Earth:
+  color: null
+  cost: null
+  defense: null
+  keywords: []
+  name: Embodiment of Earth
+  pitch: null
+  power: null
+  rarity: T
+  sa_legal: true
+  text: '''Non-attack'' action cards you control have +1{d} while defending.
+
+    At the beginning of your action phase, destroy Embodiment of Earth.'
+  types:
+  - Elemental
+  - Token
+  - Aura
+Embodiment of Lightning:
+  color: null
+  cost: null
+  defense: null
+  keywords: []
+  name: Embodiment of Lightning
+  pitch: null
+  power: null
+  rarity: T
+  sa_legal: true
+  text: When you play an attack action card, destroy this, then the attack gets go again.
+  types:
+  - Elemental
+  - Token
+  - Aura
+Enigma:
+  color: null
+  cost: null
+  defense: null
+  keywords: []
+  name: Enigma
+  pitch: null
+  power: null
+  rarity: T
+  sa_legal: true
+  text: 'Your first Spectral Shield attack each turn costs {r} less to activate.
+
+    Once per Turn Instant - {c}{c}{c}: Create a Spectral Shield token with a +1{p} counter.'
+  types:
+  - Mystic
+  - Illusionist
+  - Hero
+  - Young
+Enigma Chimera (red):
+  color: red
+  cost: 2
+  defense: 3
+  keywords:
+  - Phantasm
+  name: Enigma Chimera
+  pitch: 1
+  power: 8
+  rarity: C
+  sa_legal: true
+  text: Phantasm
+  types:
+  - Illusionist
+  - Action
+  - Attack
+Enigma Chimera (yellow):
+  color: yellow
+  cost: 2
+  defense: 3
+  keywords:
+  - Phantasm
+  name: Enigma Chimera
+  pitch: 2
+  power: 7
+  rarity: C
+  sa_legal: true
+  text: Phantasm
+  types:
+  - Illusionist
+  - Action
+  - Attack
+Entwine Lightning (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords:
+  - Lightning Fusion
+  - Go again
+  name: Entwine Lightning
+  pitch: 1
+  power: 4
+  rarity: C
+  sa_legal: true
+  text: 'Lightning Fusion
+
+    If Entwine Lightning was fused, it gains go again.'
+  types:
+  - Elemental
+  - Action
+  - Attack
+Evergreen (red):
+  color: red
+  cost: 3
+  defense: 2
+  keywords: []
+  name: Evergreen
+  pitch: 1
+  power: 7
+  rarity: R
+  sa_legal: true
+  text: If Evergreen is played from arsenal, put it on the bottom of its owner's deck when the combat
+    chain closes.
+  types:
+  - Earth
+  - Action
+  - Attack
+Fluid Motion (blue):
+  color: blue
+  cost: 0
+  defense: 3
+  keywords:
+  - Go again
+  name: Fluid Motion
+  pitch: 3
+  power: 2
+  rarity: C
+  sa_legal: true
+  text: If you've created a card this turn, this gets go again.
+  types:
+  - Mystic
+  - Action
+  - Attack
+Helm of Might and Magic:
+  color: null
+  cost: null
+  defense: 1
+  keywords:
+  - Blade Break
+  - Spellvoid 1
+  name: Helm of Might and Magic
+  pitch: null
+  power: null
+  rarity: R
+  sa_legal: true
+  text: 'Blade Break
+
+    Spellvoid 1'
+  types:
+  - Runeblade
+  - Equipment
+  - Head
+Homage to Ancestors (blue):
+  color: blue
+  cost: 0
+  defense: null
+  keywords:
+  - Legendary
+  - Transcend
+  name: Homage to Ancestors
+  pitch: 3
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Legendary
+
+    Gain 1{h}
+
+    If you''ve played another blue card this turn, transcend.'
+  types:
+  - Mystic
+  - Instant
+Jack Be Nimble (red):
+  color: red
+  cost: 0
+  defense: 3
+  keywords:
+  - Go again
+  - Steal
+  name: Jack Be Nimble
+  pitch: 1
+  power: 3
+  rarity: R
+  sa_legal: true
+  text: 'When this attacks, you may banish a Nimblism from your graveyard. If you do, this gets +1{p}
+    and go again.
+
+    When this hits a hero, steal an item they control until the end of this action phase.'
+  types:
+  - Generic
+  - Action
+  - Attack
+Lightning Surge (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords:
+  - Go again
+  name: Lightning Surge
+  pitch: 1
+  power: 4
+  rarity: C
+  sa_legal: true
+  text: If this was played from arsenal, it gets go again.
+  types:
+  - Lightning
+  - Action
+  - Attack
+Look Tuff (red):
+  color: red
+  cost: 3
+  defense: 3
+  keywords: []
+  name: Look Tuff
+  pitch: 1
+  power: 8
+  rarity: R
+  sa_legal: true
+  text: When this attacks, it gets -1{p} unless you pay {r}.
+  types:
+  - Generic
+  - Action
+  - Attack
+Manifest Muscle (blue):
+  color: blue
+  cost: 3
+  defense: 3
+  keywords: []
+  name: Manifest Muscle
+  pitch: 3
+  power: 5
+  rarity: C
+  sa_legal: true
+  text: If you've created a card this turn, this gets +1{p}.
+  types:
+  - Mystic
+  - Action
+  - Attack
+Nimblism (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords:
+  - Go again
+  name: Nimblism
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'The next attack action card with cost 1 or less you play this turn gains +3{p}.
+
+    Go again'
+  types:
+  - Generic
+  - Action
+Nullrune Boots:
+  color: null
+  cost: null
+  defense: 0
+  keywords:
+  - Arcane Barrier 1
+  name: Nullrune Boots
+  pitch: null
+  power: null
+  rarity: C
+  sa_legal: true
+  text: Arcane Barrier 1
+  types:
+  - Generic
+  - Equipment
+  - Legs
+Nullrune Hood:
+  color: null
+  cost: null
+  defense: 0
+  keywords:
+  - Arcane Barrier 1
+  name: Nullrune Hood
+  pitch: null
+  power: null
+  rarity: C
+  sa_legal: true
+  text: Arcane Barrier 1
+  types:
+  - Generic
+  - Equipment
+  - Head
+Nullrune Robe:
+  color: null
+  cost: null
+  defense: 0
+  keywords:
+  - Arcane Barrier 1
+  name: Nullrune Robe
+  pitch: null
+  power: null
+  rarity: C
+  sa_legal: true
+  text: Arcane Barrier 1
+  types:
+  - Generic
+  - Equipment
+  - Chest
+Oasis Respite (red):
+  color: red
+  cost: 1
+  defense: null
+  keywords: []
+  name: Oasis Respite
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: Prevent the next 4 damage that would be dealt to target hero this turn by a source of your choice.
+    If they have less life than each other hero, they may gain 1{h}.
+  types:
+  - Generic
+  - Instant
+On the Horizon (red):
+  color: red
+  cost: null
+  defense: 4
+  keywords: []
+  name: On the Horizon
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: When this defends, look at the top card of your deck.
+  types:
+  - Generic
+  - Block
+Pass Over (blue):
+  color: blue
+  cost: 0
+  defense: null
+  keywords:
+  - Legendary
+  - Transcend
+  name: Pass Over
+  pitch: 3
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Legendary
+
+    Banish target card from an opposing hero''s graveyard.
+
+    If you''ve played another blue card this turn, transcend.'
+  types:
+  - Mystic
+  - Instant
+Path of Same Ends (yellow):
+  color: yellow
+  cost: 0
+  defense: 2
+  keywords:
+  - Go again
+  name: Path of Same Ends
+  pitch: 2
+  power: 2
+  rarity: C
+  sa_legal: true
+  text: 'When this attacks a hero, deal 1 arcane damage to them. If damage is dealt this way, this gets
+    go again.
+
+    Instant - {r}: This gets go again.'
+  types:
+  - Lightning
+  - Runeblade
+  - Action
+  - Attack
+Phantasmal Haze (blue):
+  color: blue
+  cost: 3
+  defense: 3
+  keywords:
+  - Phantasm
+  name: Phantasmal Haze
+  pitch: 3
+  power: 6
+  rarity: C
+  sa_legal: true
+  text: 'Phantasm
+
+    When Phantasmal Haze is destroyed, create a Spectral Shield token.'
+  types:
+  - Illusionist
+  - Action
+  - Attack
+Preserve Tradition (blue):
+  color: blue
+  cost: 0
+  defense: null
+  keywords:
+  - Legendary
+  - Transcend
+  name: Preserve Tradition
+  pitch: 3
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Legendary
+
+    Put target action card from your graveyard on the bottom of your deck.
+
+    If you''ve played another blue card this turn, transcend.'
+  types:
+  - Mystic
+  - Instant
+Put in Context (blue):
+  color: blue
+  cost: 0
+  defense: 3
+  keywords: []
+  name: Put in Context
+  pitch: 3
+  power: null
+  rarity: C
+  sa_legal: true
+  text: This can only defend an attack with 3 or less base {p}.
+  types:
+  - Generic
+  - Defense Reaction
+Ravenous Rabble (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords:
+  - Go again
+  name: Ravenous Rabble
+  pitch: 1
+  power: 5
+  rarity: C
+  sa_legal: true
+  text: 'When this attacks, reveal the top card of your deck. This gets -X{p}, where X is the pitch value
+    of the card revealed this way.
+
+    Go again'
+  types:
+  - Generic
+  - Action
+  - Attack
+Rising Sun, Setting Moon (blue):
+  color: blue
+  cost: 0
+  defense: null
+  keywords:
+  - Legendary
+  - Transcend
+  name: Rising Sun, Setting Moon
+  pitch: 3
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Legendary
+
+    Draw a card, then put a card from your hand on the bottom of your deck.
+
+    If you''ve played another blue card this turn, transcend.'
+  types:
+  - Mystic
+  - Instant
+Rush of Power (red):
+  color: red
+  cost: 0
+  defense: 3
+  keywords:
+  - Quickstrike
+  name: Rush of Power
+  pitch: 1
+  power: 3
+  rarity: C
+  sa_legal: true
+  text: 'Quickstrike - If this has go again, it gets +1{p}.
+
+    When this hits a hero, deal 1 arcane damage to them.'
+  types:
+  - Lightning
+  - Runeblade
+  - Action
+  - Attack
+Scar for a Scar (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords:
+  - Go again
+  name: Scar for a Scar
+  pitch: 1
+  power: 4
+  rarity: C
+  sa_legal: true
+  text: When this is played, if you have less {h} than an opposing hero, it gets go again.
+  types:
+  - Generic
+  - Action
+  - Attack
+Second Strike (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords:
+  - Go again
+  name: Second Strike
+  pitch: 1
+  power: 3
+  rarity: C
+  sa_legal: true
+  text: When this attacks, if you've dealt damage this turn, this gets +1{p} and go again.
+  types:
+  - Lightning
+  - Action
+  - Attack
+'Second Tenet of Chi: Wind (blue)':
+  color: blue
+  cost: 3
+  defense: 3
+  keywords:
+  - Go again
+  name: 'Second Tenet of Chi: Wind'
+  pitch: 3
+  power: 5
+  rarity: R
+  sa_legal: true
+  text: If you've transcended this turn, this gets go again.
+  types:
+  - Mystic
+  - Action
+  - Attack
+Sigil of Suffering (red):
+  color: red
+  cost: 0
+  defense: 3
+  keywords: []
+  name: Sigil of Suffering
+  pitch: 1
+  power: null
+  rarity: R
+  sa_legal: true
+  text: 'Deal 1 arcane damage to the attacking hero.
+
+    If you have dealt arcane damage this turn, Sigil of Suffering gains +1{d}.'
+  types:
+  - Runeblade
+  - Defense Reaction
+Silent Stilettos:
+  color: null
+  cost: null
+  defense: 0
+  keywords:
+  - Arcane Barrier 1
+  name: Silent Stilettos
+  pitch: null
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Whenever an attacking ally you control dies or an attack action card you control is destroyed
+    by phantasm, you may pay {r}{r}{r}. If you do, destroy Silent Stilettos and gain 1 action point.
+
+    Arcane Barrier 1'
+  types:
+  - Illusionist
+  - Equipment
+  - Legs
+Sizzle (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords:
+  - Go again
+  name: Sizzle
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Your next Lightning or Elemental attack this turn gets +3{p}.
+
+    Go again'
+  types:
+  - Lightning
+  - Action
+Snatch (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords: []
+  name: Snatch
+  pitch: 1
+  power: 4
+  rarity: R
+  sa_legal: true
+  text: When this hits, draw a card.
+  types:
+  - Generic
+  - Action
+  - Attack
+Spears of Surreality (blue):
+  color: blue
+  cost: 1
+  defense: 3
+  keywords:
+  - Phantasm
+  - Go again
+  name: Spears of Surreality
+  pitch: 3
+  power: 3
+  rarity: C
+  sa_legal: true
+  text: 'Phantasm
+
+    Go again'
+  types:
+  - Illusionist
+  - Action
+  - Attack
+Spectral Manifestations (red):
+  color: red
+  cost: 2
+  defense: 2
+  keywords:
+  - Go again
+  name: Spectral Manifestations
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Create a Spectral Shield token, then if you control no other Illusionist auras, put three +1{p}
+    counters on it.
+
+    Go again'
+  types:
+  - Illusionist
+  - Action
+Spectral Rider (blue):
+  color: blue
+  cost: 3
+  defense: 3
+  keywords:
+  - Overpower
+  - Phantasm
+  name: Spectral Rider
+  pitch: 3
+  power: 6
+  rarity: C
+  sa_legal: true
+  text: 'When you play Spectral Rider, if you control a Spectral Shield, this gains overpower.
+
+    Phantasm'
+  types:
+  - Illusionist
+  - Action
+  - Attack
+Spectral Shield:
+  color: null
+  cost: null
+  defense: null
+  keywords:
+  - Ward 1
+  name: Spectral Shield
+  pitch: null
+  power: null
+  rarity: T
+  sa_legal: true
+  text: Ward 1
+  types:
+  - Illusionist
+  - Token
+  - Aura
+Spell Fray Leggings:
+  color: null
+  cost: null
+  defense: 0
+  keywords:
+  - Spellvoid 1
+  name: Spell Fray Leggings
+  pitch: null
+  power: null
+  rarity: R
+  sa_legal: true
+  text: Spellvoid 1
+  types:
+  - Generic
+  - Equipment
+  - Legs
+Springboard Somersault (yellow):
+  color: yellow
+  cost: 0
+  defense: 2
+  keywords: []
+  name: Springboard Somersault
+  pitch: 2
+  power: null
+  rarity: C
+  sa_legal: true
+  text: If Springboard Somersault is played from arsenal, it gains +2{d}.
+  types:
+  - Generic
+  - Defense Reaction
+Sprout Strength (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords:
+  - Go again
+  name: Sprout Strength
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Your next attack this turn gets +1{p}.
+
+    Your next attack this turn gets +1{p}.
+
+    Your next attack this turn gets +1{p}.
+
+    Go again'
+  types:
+  - Earth
+  - Action
+Star Fall:
+  color: null
+  cost: null
+  defense: null
+  keywords:
+  - Go again
+  name: Star Fall
+  pitch: null
+  power: 1
+  rarity: T
+  sa_legal: true
+  text: 'Once per Turn Action - {r}: Attack
+
+    If you''ve played a Lightning card this turn, this card''s attacks get +1{p} and go again.'
+  types:
+  - Lightning
+  - Runeblade
+  - Weapon
+  - Sword
+  - 2H
+Static Shock (red):
+  color: red
+  cost: 0
+  defense: 3
+  keywords:
+  - Lightning Flow
+  name: Static Shock
+  pitch: 1
+  power: 4
+  rarity: R
+  sa_legal: true
+  text: Lightning Flow - When this hits a hero, if you've played a Lightning card this turn, deal 1 arcane
+    damage to them.
+  types:
+  - Elemental
+  - Runeblade
+  - Action
+  - Attack
+Stinging Sprite (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords: []
+  name: Stinging Sprite
+  pitch: 1
+  power: 3
+  rarity: R
+  sa_legal: true
+  text: When this attacks or defends, deal 1 arcane damage to target hero.
+  types:
+  - Lightning
+  - Runeblade
+  - Action
+  - Attack
+Test of Strength (red):
+  color: red
+  cost: null
+  defense: 4
+  keywords:
+  - Clash
+  name: Test of Strength
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: When this defends, clash with the attacking hero. The winner creates a Gold token.
+  types:
+  - Generic
+  - Block
+Trip the Light Fantastic (blue):
+  color: blue
+  cost: 1
+  defense: 2
+  keywords: []
+  name: Trip the Light Fantastic
+  pitch: 3
+  power: 3
+  rarity: C
+  sa_legal: true
+  text: 'Instant - Discard this: Prevent the next 2 damage that would be dealt to you this turn.'
+  types:
+  - Lightning
+  - Action
+  - Attack
+Unmovable (blue):
+  color: blue
+  cost: 3
+  defense: 5
+  keywords: []
+  name: Unmovable
+  pitch: 3
+  power: null
+  rarity: C
+  sa_legal: true
+  text: If Unmovable is played from arsenal, it gains +1{d}.
+  types:
+  - Generic
+  - Defense Reaction
+Unmovable (red):
+  color: red
+  cost: 3
+  defense: 7
+  keywords: []
+  name: Unmovable
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: If this was played from arsenal, it gets +1{d}.
+  types:
+  - Generic
+  - Defense Reaction
+Uphold Tradition:
+  color: null
+  cost: null
+  defense: null
+  keywords:
+  - Cloaked
+  - Ward 1
+  name: Uphold Tradition
+  pitch: null
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'Cloaked
+
+    Instant - {r}, turn this face-up: Put a +1{p} counter on an aura you control with ward.
+
+    Ward 1'
+  types:
+  - Mystic
+  - Illusionist
+  - Equipment
+  - Arms
+Waning Vengeance (red):
+  color: red
+  cost: 1
+  defense: null
+  keywords:
+  - Ward 3
+  name: Waning Vengeance
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'When this leaves the arena, if you''ve pitched a blue card this turn, create a Spectral Shield
+    token.
+
+    Ward 3'
+  types:
+  - Mystic
+  - Illusionist
+  - Instant
+  - Aura
+Waxing Specter (red):
+  color: red
+  cost: 2
+  defense: null
+  keywords:
+  - Ward 3
+  name: Waxing Specter
+  pitch: 1
+  power: null
+  rarity: C
+  sa_legal: true
+  text: 'If you''ve pitched a blue card this turn, this enters the arena with a +1{p} counter.
+
+    Ward 3'
+  types:
+  - Mystic
+  - Illusionist
+  - Instant
+  - Aura
+Weave Lightning (red):
+  color: red
+  cost: 0
+  defense: 2
+  keywords:
+  - Go again
+  name: Weave Lightning
+  pitch: 1
+  power: null
+  rarity: R
+  sa_legal: true
+  text: 'The next Lightning or Elemental attack action card you play this turn gains +3{p}. If it''s fused,
+    it gains go again.
+
+    Go again'
+  types:
+  - Lightning
+  - Action
