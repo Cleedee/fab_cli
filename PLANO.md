@@ -120,8 +120,12 @@ Decklists em `data/decks/`: `enigma_sa.yaml` (pré-construído oficial Chapter 2
       resolução (físico + arcano separados, Arcane Barrier manual via parâmetro);
       triggers da Briar (Earth na 1ª vez que attack action causa dano — arma não conta;
       Lightning na 2ª non-attack action).
-- [ ] Fase 2 — sugestões de defesa/ataque + probabilidades (hipergeométrica,
-      chance de pitch; planejador de turno; lethal checker).
+- [x] Fase 2 — sugestões de defesa/ataque + probabilidades (67 testes):
+      `probabilities.py` (hipergeométrica exata: compra e pitch);
+      `defense.py` (enumeração de subsets, heurística de valor configurável,
+      Dominate, equipamentos como bloqueio sem custo de mão);
+      `attack.py` (planejador em 3 fases com fusão, Embodiment of Lightning,
+      arma condicional e corte de menor ataque para virar pitch).
 - [ ] Fase 3 — TUI (Textual).
 - [ ] Fase 4 — log de decisões e review pós-jogo.
 
