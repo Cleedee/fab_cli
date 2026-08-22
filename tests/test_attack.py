@@ -72,30 +72,29 @@ def test_look_tuff_paga_extra_quando_pode(state):
     assert plan.physical == 8
 
 
-def test_look_tuff_sem_recurso_e_cortado(state):
+def test_look_tuff_sem_recurso_joga_sem_o_extra(state):
     cards = load_cards()
     a = state.players["A"]
-    a.hand = ["Look Tuff (red)"]  # custa 4 com o {r} extra; pool 3 não cobre
+    a.hand = ["Look Tuff (red)"]  # pool 3 cobre o custo base, mas não o {r} extra
     a.action_points = 1
     a.pitch_pool = 3
     plan = plan_attack(state, "A", cards)
-    assert plan.physical == 0
-    assert any("cortado" in n for n in plan.notes)
+    assert plan.physical == 7
+    assert any("extra" in n for n in plan.notes)
 
 
-def test_look_tuff_custo_extra_vem_do_pitch_de_outra(state):
+def test_buff_e_look_tuff_sao_jogados_juntos(state):
     cards = load_cards()
     a = state.players["A"]
+    # Limitação documentada: o plano não troca um buff jogável por pitch para
+    # pagar o {r} extra do Look Tuff (jogar ambos -> 10 supera LT sozinho -> 8).
     a.hand = ["Look Tuff (red)", "Sprout Strength (red)"]
-    a.action_points = 1
-    a.pitch_pool = 3  # Sprout (não jogado por falta de AP? tem GA -> é jogado...)
     a.action_points = 2
+    a.pitch_pool = 3
     plan = plan_attack(state, "A", cards)
-    # Ambos jogáveis: Sprout dá +3 (tabela) e vira GA; custo total 4 <= 3+pitch próprio?
-    # Sprout é jogada, então não pode virar pitch; Look Tuff paga 3+1 com pool 3 + nada.
-    # Sem recursos para o extra -> corta o de menor poder (Sprout, power 0) que vira pitch.
-    assert "Look Tuff (red)" in plan.sequence
-    assert plan.pitched == ["Sprout Strength (red)"]
+    assert set(plan.sequence) == {"Look Tuff (red)", "Sprout Strength (red)"}
+    assert plan.physical == 3 + 7
+    assert plan.pitched == []
 
 
 def test_shockwave_sem_fusao_nao_tem_arcano(state):
@@ -112,7 +111,7 @@ def test_arma_com_lightning_ganha_bonus(state):
     cards = load_cards()
     a = state.players["A"]
     a.hand = ["Stinging Sprite (red)"]
-    a.action_points = 1
+    a.action_points = 2  # Sprite não tem Go Again: 1 AP para ele, 1 para a arma
     a.pitch_pool = 1
     plan = plan_attack(state, "A", cards, weapon_key="Star Fall")
     assert plan.sequence == ["Stinging Sprite (red)", "Star Fall"]

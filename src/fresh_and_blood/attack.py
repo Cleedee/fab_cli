@@ -217,7 +217,11 @@ def plan_attack(
             fused_ok = lightning_played or any(
                 "Lightning" in hand[k].types for k in sequence[: sequence.index(key)] if k in hand
             )
-            phys += _power(card, card.name in pay_extra_for)
+            phys += _power(card, key in pay_extra_for)
+            if card.name == LOOK_TUFF and key not in pay_extra_for:
+                plan.notes.append(
+                    f"{card.name}: sem {LOOK_TUFF_EXTRA_COST}{{r}} extra -> {_power(card, False)}{{p}}."
+                )
             arc += _ping(card, fused_ok)
             if card.name == SHOCKWAVE and not fused_ok:
                 plan.notes.append("Shockwave SEM fusão: sem arcano.")
