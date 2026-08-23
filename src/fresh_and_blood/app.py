@@ -169,16 +169,20 @@ class PlayerPanel(Vertical):
     }
     """
 
-    def __init__(self, side: str, hero: Hero, label: str, **kwargs) -> None:
+    def __init__(
+        self, side: str, hero: Hero, label: str, *, weapon_key: str | None = None, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.side = side
         self.hero = hero
         self.label_text = label
         self.border_title = label
+        self.weapon_key = weapon_key
 
     def compose(self) -> ComposeResult:
         yield Static(id=f"life-{self.side}")
         yield Static(id=f"res-{self.side}")
+        yield Static(id=f"weapon-{self.side}")
         yield Static(id=f"hand-{self.side}")
         yield Static(id=f"arsenal-{self.side}")
         yield Static(id=f"auras-{self.side}")
@@ -202,6 +206,17 @@ class PlayerPanel(Vertical):
             f"[bold]Pool:[/] {p.pitch_pool}{{r}}  "
             f"[bold]Pitch disp:[/] {pitch_available}"
         )
+
+        # Arma
+        if self.weapon_key:
+            weapon_card = cards.get(self.weapon_key)
+            if weapon_card:
+                txt = _card_display(self.weapon_key, weapon_card)
+            else:
+                txt = self.weapon_key
+        else:
+            txt = "(nenhuma)"
+        self.query_one(f"#weapon-{self.side}", Static).update(f"[bold]Arma:[/] {txt}")
 
         # Mão
         hand_lines = []
@@ -358,9 +373,21 @@ class FaBApp(App[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="body"):
-            yield PlayerPanel("A", self.matchup.hero_a, self.matchup.label("A"), id="panel-a")
+            yield PlayerPanel(
+                "A",
+                self.matchup.hero_a,
+                self.matchup.label("A"),
+                weapon_key=self.matchup.weapon_a,
+                id="panel-a",
+            )
             yield self._center_panel()
-            yield PlayerPanel("B", self.matchup.hero_b, self.matchup.label("B"), id="panel-b")
+            yield PlayerPanel(
+                "B",
+                self.matchup.hero_b,
+                self.matchup.label("B"),
+                weapon_key=self.matchup.weapon_b,
+                id="panel-b",
+            )
         yield self._notices_area()
         yield Input(id="command-input", placeholder="Digite um comando (help para ajuda)...")
         yield Footer()
@@ -384,7 +411,13 @@ class FaBApp(App[None]):
             f"{self.matchup.label('A')} vs {self.matchup.label('B')} — Turno 1. "
             "Comandos: [bold]help[/] para lista."
         )
-        self._log_notice('[dim]Mão inicial: adicione cartas com [bold]draw "Nome (cor)"[/].[/]')
+        p_a = self.game_state.players["A"]
+        if p_a.hand or p_a.equipment_uses:
+            self._log_notice(
+                "[dim]Mão inicial e equipamentos já carregados. /help para comandos.[/]"
+            )
+        else:
+            self._log_notice('[dim]Mão inicial: adicione cartas com [bold]draw "Nome (cor)"[/].[/]')
         self._refresh_all()
 
     # ── Notificações ──────────────────────────────────────────────

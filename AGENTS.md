@@ -42,6 +42,12 @@ Dados: `data/decks/*.yaml` (decklists), `data/cards.yaml` (gerado).
 Overrides para limitações do dataset ficam no dict `OVERRIDES` de `scripts/build_cards.py`
 (ex.: Briar jovem é dupla-face com a adulta; o dataset perde o subtipo "Young").
 
+Scripts auxiliares:
+- `scripts/fetch_decklist.py <url>` — baixa decklist da fabtcg.com e converte
+  para o formato YAML de `data/decks/` (normaliza cores `(yel)`/`(blu)`,
+  decodifica entidades HTML, soma quantidades `Nx`).
+  Aceita URL ou arquivo HTML local.
+
 ## Convenções
 
 - Docstrings/comentários em pt-BR; identificadores em inglês; sem emojis.

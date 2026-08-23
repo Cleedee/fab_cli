@@ -41,6 +41,34 @@ formato de `data/decks/` (campos `hero`, `arena`, `deck_pool`). O herói,
 a arma e os labels da TUI são derivados automaticamente da decklist; heróis
 novos usam os types do registro de cartas para validar o card-pool.
 
+```bash
+# Setup automático: mão inicial de 4 cartas sorteadas + equipamentos da arena
+fab --auto-setup
+
+# Reproduzir a mesma mão de uma partida anterior (seed)
+fab --auto-setup --seed 42
+
+# Setup a partir de arquivo JSON/YAML (mãos, arsenal, equipamentos, pitch_pool)
+fab --setup meu_estado.json --deck-a data/decks/enigma_sa.yaml
+```
+
+Com `--auto-setup` o pool é **expandido por quantidade** (ex.: 2 cópias
+entram 2x no sorteio) e as mãos são sorteadas com a semente indicada.
+Sem `--seed`, cada execução gera mãos diferentes; com `--seed 42`, a
+mesma semente produz exatamente as mesmas mãos.
+
+O formato do arquivo de setup (JSON ou YAML):
+
+```json
+{
+  "hands":     {"A": ["Snatch (red)", "Sizzle (red)"], "B": ["Unmovable (blue)"]},
+  "arsenal":   {"A": "Arcanic Shockwave (red)", "B": null},
+  "equipment": {"A": ["Blade Beckoner Helm"], "B": ["Silent Stilettos"]},
+  "pitch_pool": {"A": 1, "B": 0},
+  "weapons":   {"A": "Star Fall"}
+}
+```
+
 ### Atalhos de teclado
 
 | Tecla | Ação |
@@ -199,6 +227,33 @@ data/
 tests/                   — 80 testes (pytest)
 ```
 
+## Importar decklists da internet
+
+O script `scripts/fetch_decklist.py` baixa uma decklist do site oficial
+(fabtcg.com/decklists/) e converte para o formato YAML do projeto:
+
+```bash
+# baixa e salva em data/decks/<slug>.yaml
+python scripts/fetch_decklist.py \
+  https://fabtcg.com/decklists/richard-gillingham-enigma-eternal-weekend-blitz-championship/
+
+# escolher o arquivo de saída
+python scripts/fetch_decklist.py <url> --out data/decks/minha_lista.yaml
+
+# também aceita arquivo HTML local (para debug)
+python scripts/fetch_decklist.py /caminho/pagina.html --out data/decks/teste.yaml
+```
+
+Depois de importar, use com a CLI:
+
+```bash
+fab --deck-a data/decks/minha_lista.yaml
+```
+
+> ⚠️ O registro `data/cards.yaml` só contém as cartas do matchup Briar × Enigma.
+> Para jogar uma decklist importada com outras cartas, rode antes
+> `scripts/build_cards.py` com o dataset completo (veja AGENTS.md).
+
 ## Desenvolvimento
 
 ```bash
@@ -206,7 +261,7 @@ tests/                   — 80 testes (pytest)
 python3 -m pytest -q
 
 # lint + formatação
-ruff format src tests && ruff check src tests
+ruff format src tests scripts && ruff check src tests scripts
 ```
 
 ## Regras do formato Silver Age (TRP 7.4)
