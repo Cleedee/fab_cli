@@ -163,6 +163,8 @@ class PlayerPanel(Vertical):
         border: solid $secondary;
         padding: 0 1;
         height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
     }
     PlayerPanel > Static {
         margin: 0;
