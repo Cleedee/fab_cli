@@ -90,8 +90,11 @@ Overrides para limitações do dataset ficam no dict `OVERRIDES` de `scripts/bui
 
 - [x] Fase 0 — fundação (modelos, carddb, deck validation, decklists)
 - [x] Fase 1 — motor de combate (48 testes)
-- [x] Fase 2 — decisões (67 testes): `probabilities.py` (hipergeométrica/pitch),
-      `defense.py` (sugeridor de defesa), `attack.py` (planejador burst/lethal
-      em 3 fases; limitação: não troca buff jogável por pitch p/ {r} extra)
+- [x] Fase 2 — decisões (71 testes): `probabilities.py` (hipergeométrica/pitch),
+      `defense.py` (sugeridor de defesa c/ suporte a Embodiment of Earth e
+      Dominate corrigido: `"Action" in types` em vez de `is_non_attack_action`),
+      `attack.py` (planejador burst/lethal em 3 fases; Look Tuff faz downgrade
+      em vez de ser removido quando faltam recursos para o {r} extra;
+      limitação: não troca buff jogável por pitch p/ {r} extra)
 - [ ] Fase 3 — TUI Textual
 - [ ] Fase 4 — log de decisões + review pós-jogo

@@ -41,3 +41,12 @@ def test_pitch_azul():
     # Restam 20 cartas desconhecidas, 8 azuis; pichar nas próximas 2 compras.
     p = prob_at_least_one(20, 8, 2)
     assert 0.5 < p < 0.9
+
+
+def test_prob_at_least_certeza_quando_min_count_zero():
+    # P(pegar ao menos 0) = 1.0 sempre
+    assert prob_at_least_one(40, 5, 10) < 1.0  # sanity: P(>=1) < 1
+    from fresh_and_blood.probabilities import prob_at_least
+
+    assert prob_at_least(40, 5, 10, 0) == 1.0
+    assert prob_at_least(40, 0, 10, 0) == 1.0

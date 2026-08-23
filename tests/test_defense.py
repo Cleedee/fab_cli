@@ -45,14 +45,44 @@ def test_dominate_limita_cartas_e_actions():
         n = len(o.hand_cards) + len(o.equipment)
         if o.damage_taken == 0:
             assert n <= 2
-            actions = sum(1 for k in o.hand_cards if cards[k].is_non_attack_action)
+            # Action card = qualquer carta com "Action" no tipo
+            actions = sum(1 for k in o.hand_cards if "Action" in cards[k].types)
             assert actions <= 1
     best = opts[0]
     # Com dominate: no máx. 1 action card; Unmovable(DR)+Sizzle(action) é legal e cobre 7
     assert set(best.hand_cards) == {"Unmovable (blue)", "Sizzle (red)"}
 
 
+def test_earth_bonus_da_mais_bloqueio():
+    cards = load_cards()
+    # Sizzle (red) é non-attack action, def 2; com Earth bonus vira 3.
+    # Snatch (red) é attack action, não ganha Earth bonus.
+    hand = {"Sizzle (red)": cards["Sizzle (red)"], "Snatch (red)": cards["Snatch (red)"]}
+    # Incoming 4: sem Earth bonus, Sizzle(2)+Snatch(2)=4 cobre; com Earth, Sizzle sozinho(3) não
+    opts_earth = suggest_defense(4, hand, earth_bonus=True)
+    # Com Earth bonus, Sizzle defende com 3; ainda precisa de 1 extra (Snatch cobre)
+    best_earth = opts_earth[0]
+    assert best_earth.damage_taken == 0
+    assert best_earth.block_total >= 4
+    # Earth bonus só afeta non-attack actions: Sizzle +1, Snatch normal
+    hand_only_sizzle = {"Sizzle (red)": cards["Sizzle (red)"]}
+    opts_earth2 = suggest_defense(3, hand_only_sizzle, earth_bonus=True)
+    assert opts_earth2[0].damage_taken == 0
+    # Sem Earth, Sizzle(2) não cobre 3
+    opts_normal2 = suggest_defense(3, hand_only_sizzle)
+    assert opts_normal2[0].damage_taken == 1
+
+
 def test_nunca_vazio():
     opts = suggest_defense(5, {}, {})
     assert len(opts) >= 1
     assert opts[0].damage_taken == 5
+
+
+def test_earth_bonus_so_para_non_attack_actions():
+    cards = load_cards()
+    # Snatch (attack action) não ganha +1 do Earth
+    hand = {"Snatch (red)": cards["Snatch (red)"]}
+    opts = suggest_defense(3, hand, earth_bonus=True)
+    assert opts[0].damage_taken == 1
+    assert opts[0].block_total == 2

@@ -58,8 +58,10 @@ class DefenseOption:
 def _dominate_ok(cards_and_eq: list[tuple[str, bool]]) -> bool:
     """Dominate: no máximo 2 cartas, sendo no máximo 1 action card.
 
-    `cards_and_eq` traz pares (chave, é_action_card); equipamentos entram
-    como não-action.
+    Action cards = cartas com o tipo "Action" (ataque-ações e não-ataque-ações);
+    Defense Reactions não têm "Action" no tipo e portanto não contam.
+    `cards_and_eq` traz pares (chave, is_action_card).
+    Equipamentos entram como não-action.
     """
     if len(cards_and_eq) > 2:
         return False
@@ -67,18 +69,31 @@ def _dominate_ok(cards_and_eq: list[tuple[str, bool]]) -> bool:
 
 
 def _enumerate_hand(
-    hand: dict[str, Card], incoming: int, dominate: bool, weights: ValueWeights
+    hand: dict[str, Card],
+    incoming: int,
+    dominate: bool,
+    weights: ValueWeights,
+    *,
+    earth_bonus: bool = False,
 ) -> list[tuple[tuple[str, ...], int, float]]:
-    """Retorna [(subset, bloqueio, valor perdido)] viáveis para a mão."""
+    """Retorna [(subset, bloqueio, valor perdido)] viáveis para a mão.
+
+    `earth_bonus`: se True, non-attack actions recebem +1{d} (Embodiment of Earth).
+    """
     keys = list(hand)
     if len(keys) > MAX_ENUM_CARDS:
         return _greedy_hand(hand, incoming, weights)
     out = []
     for size in range(len(keys) + 1):
         for subset in combinations(keys, size):
-            block = sum(hand[k].defense or 0 for k in subset)
+            block = 0
+            for k in subset:
+                d = hand[k].defense or 0
+                if earth_bonus and hand[k].is_non_attack_action:
+                    d += 1
+                block += d
             lost = sum(card_value(hand[k], weights) for k in subset)
-            if dominate and not _dominate_ok([(k, hand[k].is_non_attack_action) for k in subset]):
+            if dominate and not _dominate_ok([(k, "Action" in hand[k].types) for k in subset]):
                 continue
             out.append((subset, block, lost))
     return out
@@ -107,12 +122,14 @@ def suggest_defense(
     dominate: bool = False,
     top: int = 3,
     weights: ValueWeights = DEFAULT_WEIGHTS,
+    earth_bonus: bool = False,
 ) -> list[DefenseOption]:
     """Sugere linhas de defesa ordenadas da melhor para a pior.
 
     - `hand`: apenas cartas que PODEM ser descartadas para bloquear (key -> Card).
     - `equipment_defense`: defesa ainda disponível por equipamento (uso "grátis",
       mas com microcusto para não desperdiçar a once-per-turn sem necessidade).
+    - `earth_bonus`: se True, non-attack actions defendem com +1{d} (Embodiment of Earth).
     - Sempre inclui a opção de não bloquear; nunca levanta erro por falta de opção.
     """
     equip = dict(equipment_defense or {})
@@ -125,7 +142,7 @@ def suggest_defense(
 
     options: list[DefenseOption] = []
     for hand_subset, hand_block, hand_lost in _enumerate_hand(
-        hand, incoming_damage, dominate, weights
+        hand, incoming_damage, dominate, weights, earth_bonus=earth_bonus
     ):
         for eq_subset in equip_options:
             combined = [(k, False) for k in hand_subset] + [(k, False) for k in eq_subset]

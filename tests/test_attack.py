@@ -79,7 +79,24 @@ def test_look_tuff_sem_recurso_joga_sem_o_extra(state):
     a.action_points = 1
     a.pitch_pool = 3
     plan = plan_attack(state, "A", cards)
-    assert plan.physical == 7
+    assert plan.physical == 7  # downgrade, não removeu a carta
+    assert any("extra" in n for n in plan.notes)
+
+
+def test_look_tuff_downgrade_em_vez_de_remover(state):
+    """Quando falta {r} para o extra, o plano faz downgrade em vez de cortar o Look Tuff."""
+    cards = load_cards()
+    a = state.players["A"]
+    # Look Tuff (cost 3, pitch 1) + Snatch (cost 0, pitch 1).
+    # Pool = 3. Potencial inicial = 3 + 1 (Snatch) = 4 >= 3+1=custo c/ extra.
+    # Depois de ambos no plano, pool = 3, custo sem extra = 3, cabe.
+    a.hand = ["Look Tuff (red)", "Snatch (red)"]
+    a.action_points = 2
+    a.pitch_pool = 3
+    plan = plan_attack(state, "A", cards)
+    assert "Look Tuff (red)" in plan.sequence
+    assert "Snatch (red)" in plan.sequence
+    assert plan.physical == 7 + 4  # Look Tuff sem extra (7) + Snatch (4)
     assert any("extra" in n for n in plan.notes)
 
 

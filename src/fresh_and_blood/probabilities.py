@@ -32,6 +32,8 @@ def prob_exactly(deck_size: int, copies: int, draws: int, count: int) -> float:
 def prob_at_least(deck_size: int, copies: int, draws: int, min_count: int = 1) -> float:
     """P(comprar pelo menos `min_count` das `copies` em `draws`)."""
     upper = min(draws, copies)
+    if min_count <= 0:
+        return 1.0
     if min_count > upper:
         return 0.0
     return sum(hypergeom_pmf(deck_size, copies, draws, k) for k in range(min_count, upper + 1))

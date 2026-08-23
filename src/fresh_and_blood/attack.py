@@ -165,6 +165,19 @@ def plan_attack(
         return me.pitch_pool + sum(hand[k].pitch or 0 for k in hand if k not in played)
 
     while sum(costs.values()) > available_now():
+        # Tenta primeiro downgrade do Look Tuff (joga sem o {r} extra).
+        downgraded = False
+        for k in list(pay_extra_for):
+            if k in sequence and k in hand and hand[k].name == LOOK_TUFF:
+                costs[k] -= LOOK_TUFF_EXTRA_COST
+                pay_extra_for.discard(k)
+                plan.notes.append(
+                    f"{hand[k].name}: sem {LOOK_TUFF_EXTRA_COST}{{r}} extra -> {_power(hand[k], False)}{{p}}."
+                )
+                downgraded = True
+                break
+        if downgraded:
+            continue
         victims = [k for k in sequence if k in hand]
         if not victims:
             break
@@ -175,6 +188,7 @@ def plan_attack(
         pay_extra_for.discard(victim)
         plan.notes.append(f"{hand[victim].name}: cortado do plano para virar pitch.")
 
+    # Após equilibrar recursos, verifica se a arma cabe.
     if weapon_in_plan and sum(costs.values()) > available_now():
         del costs[weapon_key]
         sequence.remove(weapon_key)
