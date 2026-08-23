@@ -2,7 +2,7 @@
 
 import pytest
 
-from fresh_and_blood.models import Hero, new_game
+from fresh_and_blood.models import GameState, Hero, new_game
 from fresh_and_blood.recorder import SessionLog, find_logs, load_session, save_session
 from fresh_and_blood.review import compute_metrics, replay_summary
 
@@ -123,3 +123,28 @@ def test_replay_summary_limite(session, state):
     # Deve ter 3 ações + 2 cabeçalho + 1 linha de aviso = ~6
     action_lines = [l for l in lines if "draw" in l]
     assert len(action_lines) <= 3
+
+
+def test_snapshot_restaura_estado_completo(session, state, tmp_path):
+    """Save -> sair -> load deve restaurar mãos, vida, turno e chain."""
+    state.players["A"].hand = ["Snatch (red)", "Sizzle (red)"]
+    state.players["B"].hand = ["Unmovable (blue)"]
+    state.players["B"].life = 15
+    state.active_player = "B"
+    state.turn = 4
+    session.record(state, action="draw", description="Snatch (red)")
+    session.record(state, action="attack", description="Snatch (red) (4{p})")
+
+    path = tmp_path / "partida.json"
+    save_session(session, path)
+
+    loaded = load_session(path)
+    assert len(loaded.entries) == 2
+
+    snap = loaded.entries[-1].state_snapshot
+    restored = GameState.from_dict(snap)
+    assert restored.players["A"].hand == ["Snatch (red)", "Sizzle (red)"]
+    assert restored.players["B"].hand == ["Unmovable (blue)"]
+    assert restored.players["B"].life == 15
+    assert restored.active_player == "B"
+    assert restored.turn == 4

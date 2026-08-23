@@ -21,6 +21,7 @@ from fresh_and_blood import combat as cmb
 from fresh_and_blood import defense as dfs
 from fresh_and_blood import probabilities as prob
 from fresh_and_blood import recorder as rec
+from fresh_and_blood import review as rvw
 from fresh_and_blood.carddb import load_cards
 from fresh_and_blood.models import (
     Card,
@@ -249,18 +250,37 @@ class FaBApp(App[None]):
         Binding("f6", "plan_attack", "Planejar ataque"),
     ]
 
-    # Estado reativo — incrementado após cada mutação
+    # Comandos que nao alteram estado (undo nao afeta)
+    _READONLY_COMMANDS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "",
+            "help",
+            "plan",
+            "suggest",
+            "prob",
+            "status",
+            "clear",
+            "log",
+            "review",
+            "metrics",
+            "undo",
+        }
+    )
+
+    # Estado reativo — incrementado apos cada mutacao
     version: reactive[int] = reactive(0)
     game_state: GameState
     cards: dict[str, Card]
     notices: list[str]
     session_log: rec.SessionLog
+    _undo_stack: list[dict]
 
     def __init__(self, state: GameState, cards_dict: dict[str, Card]) -> None:
         super().__init__()
         self.game_state = state
         self.cards = cards_dict
         self.notices = []
+        self._undo_stack = []
         self.session_log = rec.SessionLog(
             hero_a=BRIAR.name,
             hero_b=ENIGMA.name,
@@ -383,13 +403,25 @@ class FaBApp(App[None]):
             return
         inp = self.query_one("#command-input", Input)
         inp.clear()
+
+        # Descobre se o comando altera estado para salvar snapshot
+        parts = __import__("shlex").split(raw) if raw else []
+        cmd = parts[0].lower() if parts else ""
+        is_mutation = cmd not in self._READONLY_COMMANDS and cmd != ""
+        if is_mutation:
+            self._undo_stack.append(self.game_state.to_dict())
+
         try:
             self._exec(raw)
         except (cmb.CombatError, ValueError) as e:
+            if is_mutation and self._undo_stack:
+                self._undo_stack.pop()
             self._notify(f"Erro: {e}")
         except BaseException as e:
             if isinstance(e, (KeyboardInterrupt, SystemExit)):
                 raise
+            if is_mutation and self._undo_stack:
+                self._undo_stack.pop()
             self._notify(f"Erro inesperado: {type(e).__name__}: {e}")
         self._refresh_all()
 
@@ -426,6 +458,8 @@ class FaBApp(App[None]):
             "load": self._cmd_load,
             "review": self._cmd_review,
             "metrics": self._cmd_metrics,
+            "undo": self._cmd_undo,
+            "reset": self._cmd_reset,
             "": lambda a: None,
         }
         handler = dispatch.get(cmd)
@@ -462,6 +496,8 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]load[/] [nome]             — carrega sessão anterior")
         self._log_notice("  [bold]review[/]                  — visão geral do replay")
         self._log_notice("  [bold]metrics[/]                 — estatísticas da sessão")
+        self._log_notice("  [bold]undo[/]                    — desfaz a última ação")
+        self._log_notice("  [bold]reset[/]                   — reinicia a partida do zero")
         self._log_notice("  [bold]help[/]                    — esta mensagem")
 
     def _cmd_draw(self, args: list[str]) -> None:
@@ -565,7 +601,7 @@ class FaBApp(App[None]):
         defender = self.game_state.opponent_of(self.game_state.active_player)
         keys = []
         for a in args:
-            key = self._resolve_card(a)
+            key = self._resolve_card(a, side=defender)
             keys.append(key)
         notices = cmb.defend_link(self.game_state, defender, keys, self.cards)
         for n in notices:
@@ -576,7 +612,7 @@ class FaBApp(App[None]):
         if not args:
             raise ValueError("uso: equip <nome>")
         defender = self.game_state.opponent_of(self.game_state.active_player)
-        key = self._resolve_card(" ".join(args))
+        key = self._resolve_card(" ".join(args), side=defender)
         gained = cmb.use_equipment_defense(self.game_state, defender, key, self.cards)
         self._log_notice(f"🛡 Equipamento {key}: +{gained} de bloqueio.")
 
@@ -622,19 +658,29 @@ class FaBApp(App[None]):
 
     def _cmd_plan(self, args: list[str]) -> None:
         """plan — mostra sugestão de linha de ataque."""
-        hero_key = self.game_state.players[self.game_state.active_player].hero_key
+        side = self.game_state.active_player
+        me = self.game_state.players[side]
+        hero_key = me.hero_key
         weapon_key = WEAPONS.get(hero_key)
-        opp = self.game_state.opponent_of(self.game_state.active_player)
+        opp = self.game_state.opponent_of(side)
         opp_life = self.game_state.players[opp].life
 
         plan = atk.plan_attack(
             self.game_state,
-            self.game_state.active_player,
+            side,
             self.cards,
             opponent_life=opp_life,
             weapon_key=weapon_key,
         )
-        self._log_notice("[bold cyan]📋 Plano de ataque sugerido:[/]")
+        self._log_notice(
+            f"[bold cyan]📋 Plano de ataque:[/] {HERO_LABELS.get(side, side)} "
+            f"(AP {me.action_points}, pool {me.pitch_pool}{{r}})"
+        )
+        if me.action_points <= 0:
+            self._log_notice(
+                "[yellow]  Sem action points — use [bold]next[/] para virar o turno "
+                "ou [bold]switch[/] para o outro lado.[/]"
+            )
         if plan.sequence:
             self._log_notice(f"  Sequência: {' → '.join(plan.sequence)}")
         else:
@@ -731,11 +777,112 @@ class FaBApp(App[None]):
         self.notices.clear()
         self.query_one("#notices-log", RichLog).clear()
 
+    def _cmd_undo(self, args: list[str]) -> None:
+        """undo — desfaz a última ação que alterou o estado."""
+        if not self._undo_stack:
+            raise ValueError("Nada para desfazer.")
+        prev = self._undo_stack.pop()
+        self.game_state = GameState.from_dict(prev)
+        # Remove última entrada do log da sessão
+        if self.session_log.entries:
+            self.session_log.entries.pop()
+        self._log_notice("[yellow]↩ Desfeito: estado anterior restaurado.[/]")
+
+    def _cmd_reset(self, args: list[str]) -> None:
+        """reset — reinicia a partida do zero (limpa todo o estado)."""
+        # Salva snapshot caso queira desfazer o reset
+        self._undo_stack.append(self.game_state.to_dict())
+        self.game_state = new_game(BRIAR, ENIGMA, "A")
+        self.notices.clear()
+        self.query_one("#notices-log", RichLog).clear()
+        # Reinicia o log da sessão
+        self.session_log.entries.clear()
+        self._log_notice("[bold green]🔄 Partida reiniciada![/]")
+        self._log_notice("Briar (A) vs Enigma (B) — Turno 1.")
+
+    # ── Comandos da Fase 4 ────────────────────────────────────
+
+    def _cmd_log(self, args: list[str]) -> None:
+        """log — exibe o histórico da sessão."""
+        lines = rvw.replay_summary(self.session_log, max_entries=60)
+        for line in lines:
+            self._log_notice(line)
+
+    def _cmd_save(self, args: list[str]) -> None:
+        """save [nome] — salva o log da sessão."""
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        nome = (
+            " ".join(args)
+            if args
+            else f"sessao_{self.session_log.start_time[:19].replace(':', '-')}"
+        )
+        path = LOG_DIR / f"{nome}.json"
+        rec.save_session(self.session_log, path)
+        self._log_notice(f"💾 Sessão salva em: [bold]{path.name}[/]")
+
+    def _cmd_load(self, args: list[str]) -> None:
+        """load [nome] — carrega sessão anterior."""
+        if args:
+            nome = " ".join(args)
+            path = LOG_DIR / f"{nome}.json"
+            if not path.exists():
+                candidates = list(LOG_DIR.glob(f"{nome}*.json"))
+                if not candidates:
+                    raise ValueError(f"Arquivo não encontrado: {nome}.json")
+                path = candidates[0]
+        else:
+            logs = rec.find_logs(LOG_DIR)
+            if not logs:
+                raise ValueError("Nenhum log salvo encontrado.")
+            path = logs[0]
+
+        loaded = rec.load_session(path)
+        self._restore_session(loaded)
+
+        self._log_notice(f"[bold cyan]📂 Sessão carregada: {path.name}[/]")
+        lines = rvw.replay_summary(loaded, max_entries=30)
+        for line in lines:
+            self._log_notice(line)
+
+    def _cmd_review(self, args: list[str]) -> None:
+        """review — visão geral do replay."""
+        lines = rvw.replay_summary(self.session_log)
+        for line in lines:
+            self._log_notice(line)
+
+    def _cmd_metrics(self, args: list[str]) -> None:
+        """metrics — estatísticas da sessão atual."""
+        m = rvw.compute_metrics(self.session_log)
+        for line in m.to_lines():
+            self._log_notice(line)
+
     # ── Helpers ──────────────────────────────────────────────────
 
-    def _resolve_card(self, text: str) -> str:
-        """Resolve texto para chave de carta; aceita parcial ou número da mão."""
-        p = self.game_state.players[self.game_state.active_player]
+    def _restore_session(self, loaded: rec.SessionLog) -> None:
+        """Restaura game_state e session_log a partir de um log carregado.
+
+        Usa o snapshot da última ação registrada; sem isso, levanta erro.
+        Não depende da UI, então é testável isoladamente.
+        """
+        if not loaded.entries:
+            raise ValueError("Sessão não contém ações para restaurar.")
+        last_snapshot = loaded.entries[-1].state_snapshot
+        try:
+            self.game_state = GameState.from_dict(last_snapshot)
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValueError(f"Snapshot da sessão inválido: {e}")
+        self.session_log = loaded
+        self._undo_stack.clear()
+        self.notices.clear()
+
+    def _resolve_card(self, text: str, side: str | None = None) -> str:
+        """Resolve texto para chave de carta; aceita parcial ou número da mão.
+
+        `side`: se informado, busca na mão desse jogador (ex.: defensor).
+        Padrão: jogador ativo.
+        """
+        side = side or self.game_state.active_player
+        p = self.game_state.players[side]
 
         # Número da mão?
         if text.isdigit():

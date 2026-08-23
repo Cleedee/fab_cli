@@ -157,3 +157,21 @@ def test_sem_arma_informada_avisa(state):
     a.action_points = 1
     plan = plan_attack(state, "A", cards)
     assert any("Sem arma informada" in n for n in plan.notes)
+
+
+def test_arma_reavaliada_apos_corte_por_recurso(state):
+    """Carta cara cortada por falta de recurso libera AP para a arma.
+
+    Look Tuff (custo 3) com pool 0 não é pagável -> vira pitch da arma
+    em vez de "sem AP" falso. (bug: arma era decidida antes dos cortes)
+    """
+    cards = load_cards()
+    a = state.players["A"]
+    a.hand = ["Look Tuff (red)"]
+    a.action_points = 1
+    a.pitch_pool = 0
+    plan = plan_attack(state, "A", cards, weapon_key="Star Fall")
+    assert plan.sequence == ["Star Fall"]
+    assert plan.pitched == ["Look Tuff (red)"]
+    assert plan.physical == 1  # Star Fall (sem Lightning)
+    assert not any("sem AP" in n for n in plan.notes)

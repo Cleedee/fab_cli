@@ -78,6 +78,28 @@ def _ping(card: Card, fused_ok: bool) -> int:
     return ping
 
 
+def _ap_left(player, hand: dict[str, Card], sequence: list[str]) -> int:
+    """AP restante após executar a sequência (Go Again e aura considerados)."""
+    ap = player.action_points
+    aura = "Embodiment of Lightning" in player.auras
+    for k in sequence:
+        card = hand[k]
+        if _is_buff(card):
+            ap -= 1
+            if "Go again" in card.keywords:
+                ap += 1
+            continue
+        innate_ga = "Go again" in card.keywords
+        used_aura = False
+        if not innate_ga and aura:
+            aura = False
+            used_aura = True
+        ap -= 1
+        if innate_ga or used_aura:
+            ap += 1
+    return ap
+
+
 def plan_attack(
     state: GameState,
     side: str,
@@ -148,17 +170,8 @@ def plan_attack(
                 cost += LOOK_TUFF_EXTRA_COST
         costs[key] = cost
 
-    weapon_in_plan = False
-    if weapon_key is None:
-        plan.notes.append("Sem arma informada: plano considera só cartas.")
-    elif me.weapon_attacks_this_turn:
-        plan.notes.append("Arma já usada neste turno.")
-    elif ap < 1:
-        plan.notes.append(f"{cards[weapon_key].name}: sem AP para atacar com a arma.")
-    else:
-        sequence.append(weapon_key)
-        weapon_in_plan = True
-        costs[weapon_key] = 1
+    # A arma é avaliada DEPOIS da fase 2: cartas cortadas por falta de recurso
+    # liberam AP que a arma pode usar.
 
     # ---- Fase 2: viabilidade de recursos ----------------------------------
     def available_now() -> int:
@@ -188,11 +201,20 @@ def plan_attack(
         pay_extra_for.discard(victim)
         plan.notes.append(f"{hand[victim].name}: cortado do plano para virar pitch.")
 
-    # Após equilibrar recursos, verifica se a arma cabe.
-    if weapon_in_plan and sum(costs.values()) > available_now():
-        del costs[weapon_key]
-        sequence.remove(weapon_key)
+    # ---- Arma: avaliada com o AP e recursos FINAIS da sequência -------------
+    weapon_in_plan = False
+    if weapon_key is None:
+        plan.notes.append("Sem arma informada: plano considera só cartas.")
+    elif me.weapon_attacks_this_turn:
+        plan.notes.append("Arma já usada neste turno.")
+    elif _ap_left(me, hand, sequence) < 1:
+        plan.notes.append(f"{cards[weapon_key].name}: sem AP para atacar com a arma.")
+    elif sum(costs.values()) + 1 > available_now():
         plan.notes.append(f"{cards[weapon_key].name}: sem recursos para o {{r}}.")
+    else:
+        sequence.append(weapon_key)
+        weapon_in_plan = True
+        costs[weapon_key] = 1
 
     # ---- Fase 3: avaliação determinística ---------------------------------
     phys = 0
