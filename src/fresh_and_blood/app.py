@@ -171,15 +171,12 @@ class PlayerPanel(Vertical):
     }
     """
 
-    def __init__(
-        self, side: str, hero: Hero, label: str, *, weapon_key: str | None = None, **kwargs
-    ) -> None:
+    def __init__(self, side: str, hero: Hero, label: str, **kwargs) -> None:
         super().__init__(**kwargs)
         self.side = side
         self.hero = hero
         self.label_text = label
         self.border_title = label
-        self.weapon_key = weapon_key
 
     def compose(self) -> ComposeResult:
         yield Static(id=f"life-{self.side}")
@@ -209,16 +206,21 @@ class PlayerPanel(Vertical):
             f"[bold]Pitch disp:[/] {pitch_available}"
         )
 
-        # Arma
-        if self.weapon_key:
-            weapon_card = cards.get(self.weapon_key)
-            if weapon_card:
-                txt = _card_display(self.weapon_key, weapon_card)
+        # Arma(s)
+        weapon_lines = []
+        for key in p.weapons:
+            card = cards.get(key)
+            if card:
+                slot = "2H" if "2H" in card.types else "1H"
+                txt = _card_display(key, card)
+                weapon_lines.append(f"  {txt}  [dim]({slot})[/]")
             else:
-                txt = self.weapon_key
-        else:
-            txt = "(nenhuma)"
-        self.query_one(f"#weapon-{self.side}", Static).update(f"[bold]Arma:[/] {txt}")
+                weapon_lines.append(f"  {key} [?]")
+        if not weapon_lines:
+            weapon_lines.append(" (nenhuma)")
+        self.query_one(f"#weapon-{self.side}", Static).update(
+            "[bold]Arma(s):[/]\n" + "\n".join(weapon_lines)
+        )
 
         # Mão
         hand_lines = []
@@ -379,7 +381,6 @@ class FaBApp(App[None]):
                 "A",
                 self.matchup.hero_a,
                 self.matchup.label("A"),
-                weapon_key=self.matchup.weapon_a,
                 id="panel-a",
             )
             yield self._center_panel()
@@ -387,7 +388,6 @@ class FaBApp(App[None]):
                 "B",
                 self.matchup.hero_b,
                 self.matchup.label("B"),
-                weapon_key=self.matchup.weapon_b,
                 id="panel-b",
             )
         yield self._notices_area()
@@ -586,7 +586,7 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]arsenal[/] <carta>        — coloca carta no arsenal")
         self._log_notice("  [bold]play[/] <carta>           — joga non-attack action")
         self._log_notice("  [bold]attack[/] <carta>         — declara ataque [dominate=...]")
-        self._log_notice("  [bold]weapon[/]                  — ataca com a arma")
+        self._log_notice("  [bold]weapon[/] [1|2]            — ataca com a arma (índice)")
         self._log_notice("  [bold]boost[/] <N>               — +N{p} no link atual")
         self._log_notice("  [bold]arcane[/] <N>              — +N arcano no link atual")
         self._log_notice("  [bold]defend[/] <carta> [carta] — bloqueia link oponente")
@@ -694,11 +694,16 @@ class FaBApp(App[None]):
         )
 
     def _cmd_weapon(self, args: list[str]) -> None:
-        """weapon — ataca com a arma."""
-        hero_key = self.game_state.players[self.game_state.active_player].hero_key
-        weapon_key = self.matchup.weapon_for(hero_key)
-        if not weapon_key:
-            raise cmb.CombatError(f"Arma não definida para {hero_key}")
+        """weapon [1|2] — ataca com a arma (1 ou 2 para escolher, se houver mais de uma)."""
+        p = self.game_state.players[self.game_state.active_player]
+        if not p.weapons:
+            raise cmb.CombatError("Nenhuma arma equipada.")
+        idx = 0
+        if args and args[0].isdigit():
+            idx = int(args[0]) - 1
+        if idx < 0 or idx >= len(p.weapons):
+            raise cmb.CombatError(f"Índice de arma inválido. Use 1-{len(p.weapons)}")
+        weapon_key = p.weapons[idx]
         card = self.cards.get(weapon_key)
         if not card:
             raise cmb.CombatError(f"Arma {weapon_key} não encontrada no registro")
@@ -797,8 +802,7 @@ class FaBApp(App[None]):
         """plan — mostra sugestão de linha de ataque."""
         side = self.game_state.active_player
         me = self.game_state.players[side]
-        hero_key = me.hero_key
-        weapon_key = self.matchup.weapon_for(hero_key)
+        weapon_key = me.weapons[0] if me.weapons else None
         opp = self.game_state.opponent_of(side)
         opp_life = self.game_state.players[opp].life
 

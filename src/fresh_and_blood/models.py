@@ -92,6 +92,8 @@ class PlayerState:
     # equipamentos usáveis: chave -> durabilidade restante (None = destrói-se só por efeito)
     equipment_uses: dict[str, int | None] = field(default_factory=dict)
     equipment_destroyed: list[str] = field(default_factory=list)
+    # armas em jogo: 0-2 cartas. Arma 2H ocupa slot único (fora o limite de 2).
+    weapons: list[str] = field(default_factory=list)
 
     # --- contadores por turno (resetados em start_turn) ---
     hero_ability_used: bool = False

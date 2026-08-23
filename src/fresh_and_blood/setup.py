@@ -110,6 +110,37 @@ def apply_setup(state: GameState, setup: dict, cards: dict[str, Card]) -> None:
             raise ValueError(f"pitch_pool negativo para {side}: {pool}")
         state.players[side].pitch_pool = int(pool)
 
+    # Armas em jogo — valida número de slots (máx 2; 2H ocupa único slot)
+    for side, keys in setup.get("weapons", {}).items():
+        if side not in VALID_SIDES:
+            raise ValueError(f"lado inválido no setup: {side}")
+        if not keys:
+            continue
+        if isinstance(keys, str):
+            keys = [keys]
+        # Garantir que só há uma arma 2H ou no máximo 2 armas 1H
+        has_2h = any("2H" in cards[k].types for k in keys if k in cards)
+        if has_2h and len(keys) > 1:
+            raise ValueError(
+                f"Arma 2H ocupa ambos os slots; não pode haver outra arma no lado {side}"
+            )
+        if not has_2h and len(keys) > 2:
+            raise ValueError(f"Máximo de 2 armas 1H por lado; {side} tem {len(keys)}")
+        for key in keys:
+            _validate_key(key, cards)
+            card = cards[key]
+            if not card.is_weapon:
+                raise ValueError(f"{key} não é uma arma")
+        state.players[side].weapons = list(keys)
+
+
+def _weapon_slot_label(key: str, cards: dict[str, Card]) -> str:
+    """Rótulo do slot de uma arma: '2H' se for duas mãos, '1H' caso contrário."""
+    card = cards.get(key)
+    if card is not None and "2H" in card.types:
+        return "2H"
+    return "1H"
+
 
 def setup_weapons(setup: dict) -> dict[str, str | None]:
     """Retorna as armas definidas no setup (por lado), se houver."""
@@ -142,6 +173,24 @@ def auto_setup(
     rng = random.Random(seed)
     for side, deck in (("A", deck_a), ("B", deck_b)):
         p = state.players[side]
+
+        # Armas da arena: equipa no máximo 2. Arma 2H ocupa slot único.
+        weapons: list[str] = []
+        for key in deck.arena:
+            if len(weapons) >= 2:
+                break
+            card = cards.get(key)
+            if card is None or not card.is_weapon:
+                continue
+            if "2H" in card.types and weapons:
+                # 2H ocuparia ambos os slots; só equipa se nenhuma arma já está
+                continue
+            if "2H" in card.types:
+                weapons = [key]  # substitui qualquer outra arma
+                break
+            weapons.append(key)
+        p.weapons = weapons
+
         # Equipamentos da arena: um por slot (Head, Chest, Arms, Legs)
         equipped_slots: set[str] = set()
         for key in deck.arena:
