@@ -40,6 +40,34 @@ def test_auto_setup_popula_mao_e_equip(cards, decks, heroes):
     assert state.players["B"].arsenal is None
 
 
+def test_auto_setup_um_equip_por_slot(cards, decks, heroes):
+    """auto_setup equipa no máximo um item por slot (Head, Chest, Arms, Legs)."""
+    state = new_game(heroes[0], heroes[1], "A")
+    auto_setup(state, decks[0], decks[1], cards, hand_size=4)
+
+    def slots_ocupados(pstate):
+        slots = set()
+        for key in pstate.equipment_uses:
+            card = cards.get(key)
+            if card and card.is_equipment:
+                slot = card.equipment_slot
+                if slot:
+                    assert slot not in slots, f"slot {slot} duplicado: {key}"
+                    slots.add(slot)
+        return slots
+
+    slots_a = slots_ocupados(state.players["A"])
+    slots_b = slots_ocupados(state.players["B"])
+    # Briar tem Head, Chest e Legs (sem Arms); Enigma tem Head, Chest, Arms, Legs
+    assert "Head" in slots_a
+    assert "Chest" in slots_a
+    assert "Legs" in slots_a
+    assert "Head" in slots_b
+    assert "Chest" in slots_b
+    assert "Arms" in slots_b
+    assert "Legs" in slots_b
+
+
 def test_auto_setup_hand_size_personalizado(cards, decks, heroes):
     state = new_game(heroes[0], heroes[1], "A")
     auto_setup(state, decks[0], decks[1], cards, hand_size=2)
@@ -83,6 +111,24 @@ def test_equipamento_nao_equip_levanta_erro(cards, decks, heroes):
     state = new_game(heroes[0], heroes[1], "A")
     with pytest.raises(ValueError, match="não é um equipamento"):
         apply_setup(state, {"equipment": {"A": ["Snatch (red)"]}}, cards)
+
+
+def test_apply_setup_slot_conflito_levanta_erro(cards, decks, heroes):
+    """apply_setup rejeita dois equipamentos no mesmo slot."""
+    state = new_game(heroes[0], heroes[1], "A")
+    setup = {"equipment": {"A": ["Blade Beckoner Helm", "Nullrune Hood"]}}
+    with pytest.raises(ValueError, match="conflita.*slot Head"):
+        apply_setup(state, setup, cards)
+
+
+def test_apply_setup_slots_distintos_ok(cards, decks, heroes):
+    """Equipamentos em slots diferentes são aceitos."""
+    state = new_game(heroes[0], heroes[1], "A")
+    setup = {
+        "equipment": {"A": ["Blade Beckoner Helm", "Blossom of Spring", "Blade Beckoner Boots"]}
+    }
+    apply_setup(state, setup, cards)
+    assert len(state.players["A"].equipment_uses) == 3
 
 
 def test_lado_invalido_levanta_erro(cards, decks, heroes):
@@ -176,3 +222,14 @@ def test_auto_setup_pool_expandido_por_quantidade(cards, decks, heroes):
     assert len(state.players["A"].hand) == total
     # Deve ter ao menos uma repetição (deck tem 47 cópias > chaves únicas)
     assert len(set(state.players["A"].hand)) < total
+
+
+def test_equipment_slot_propriedade(cards):
+    """equipment_slot retorna o slot correto para cada equipamento."""
+    assert cards["Blade Beckoner Helm"].equipment_slot == "Head"
+    assert cards["Blade Beckoner Boots"].equipment_slot == "Legs"
+    assert cards["Blossom of Spring"].equipment_slot == "Chest"
+    assert cards["Uphold Tradition"].equipment_slot == "Arms"
+    assert cards["Star Fall"].equipment_slot is None  # arma não tem slot
+    # carta não-equipamento
+    assert cards["Snatch (red)"].equipment_slot is None

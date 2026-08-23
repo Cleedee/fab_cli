@@ -51,6 +51,14 @@ class Card:
         return "Equipment" in self.types
 
     @property
+    def equipment_slot(self) -> str | None:
+        """Slot do equipamento: Head, Chest, Arms ou Legs. None se não tem slot."""
+        for slot in ("Head", "Chest", "Arms", "Legs"):
+            if slot in self.types:
+                return slot
+        return None
+
+    @property
     def is_hero(self) -> bool:
         return "Hero" in self.types
 
