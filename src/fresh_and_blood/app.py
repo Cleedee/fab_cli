@@ -7,6 +7,7 @@ O usuário controla AMBOS os lados via comandos textuais.
 from __future__ import annotations
 
 import shlex
+from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
@@ -30,34 +31,56 @@ from fresh_and_blood.models import (
     new_game,
 )
 
-# ── Heróis do matchup inicial ──────────────────────────────────────────
-
-BRIAR = Hero(
-    key="Briar, Warden of Thorns",
-    name="Briar, Warden of Thorns",
-    life=20,
-    intellect=4,
-    classes=("Runeblade",),
-    talents=("Earth", "Lightning"),
-)
-ENIGMA = Hero(
-    key="Enigma",
-    name="Enigma",
-    life=20,
-    intellect=4,
-    classes=("Illusionist",),
-    talents=("Mystic",),
-)
+# ── Matchup ────────────────────────────────────────────────────────────
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 DECK_DIR = DATA_DIR / "decks"
 LOG_DIR = DATA_DIR / "logs"
 
-# ── Constantes de carta (chaves) ───────────────────────────────────────
 
-WEAPONS = {"Briar, Warden of Thorns": "Star Fall", "Enigma": "Cosmo, Scroll of Ancestral Tapestry"}
+@dataclass(frozen=True)
+class Matchup:
+    """Configuração da partida: heróis e armas de cada lado.
 
-HERO_LABELS = {"A": "Briar (A)", "B": "Enigma (B)"}
+    Permite jogar com decks arbitrários; `weapon_*` são chaves das cartas
+    (None se o deck não tem arma).
+    """
+
+    hero_a: Hero
+    hero_b: Hero
+    weapon_a: str | None = None
+    weapon_b: str | None = None
+
+    def hero(self, side: str) -> Hero:
+        return self.hero_a if side == "A" else self.hero_b
+
+    def label(self, side: str) -> str:
+        return f"{self.hero(side).name} ({side})"
+
+    def weapon_for(self, hero_key: str) -> str | None:
+        return {self.hero_a.key: self.weapon_a, self.hero_b.key: self.weapon_b}.get(hero_key)
+
+
+DEFAULT_MATCHUP = Matchup(
+    hero_a=Hero(
+        key="Briar, Warden of Thorns",
+        name="Briar, Warden of Thorns",
+        life=20,
+        intellect=4,
+        classes=("Runeblade",),
+        talents=("Earth", "Lightning"),
+    ),
+    hero_b=Hero(
+        key="Enigma",
+        name="Enigma",
+        life=20,
+        intellect=4,
+        classes=("Illusionist",),
+        talents=("Mystic",),
+    ),
+    weapon_a="Star Fall",
+    weapon_b="Cosmo, Scroll of Ancestral Tapestry",
+)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────
@@ -89,6 +112,44 @@ def _find_card(partial: str, cards: dict[str, Card]) -> str | None:
         if partial in key.lower():
             return key
     return None
+
+
+def _card_details(key: str, card: Card) -> list[str]:
+    """Linhas com todos os detalhes de uma carta (para o log de notícias)."""
+    lines: list[str] = []
+    header = f"[bold cyan]🂠 {card.name}[/]"
+    if card.color:
+        header += f" [bold]({card.color.value})[/]"
+    lines.append(header)
+
+    meta: list[str] = []
+    if card.types:
+        meta.append(", ".join(card.types))
+    if card.rarity:
+        meta.append(f"[{card.rarity}]")
+    lines.append("  [dim]" + " | ".join(meta) + "[/]")
+
+    stats: list[str] = []
+    if card.cost is not None:
+        stats.append(f"Custo: {card.cost}{{r}}")
+    if card.pitch is not None:
+        stats.append(f"Pitch: {card.pitch}")
+    if card.power is not None:
+        stats.append(f"Poder: {card.power}{{p}}")
+    if card.defense is not None:
+        stats.append(f"Defesa: {card.defense}{{d}}")
+    if stats:
+        lines.append("  [bold]" + "  |  ".join(stats) + "[/]")
+
+    if card.keywords:
+        lines.append("  Keywords: " + ", ".join(card.keywords))
+
+    if card.text:
+        lines.append("  " + card.text.replace("\n", "\n  "))
+
+    if not card.sa_legal:
+        lines.append("  [red]Ilegal em Silver Age.[/]")
+    return lines
 
 
 # ── Widgets ────────────────────────────────────────────────────────────
@@ -254,6 +315,7 @@ class FaBApp(App[None]):
     _READONLY_COMMANDS: ClassVar[frozenset[str]] = frozenset(
         {
             "",
+            "card",
             "help",
             "plan",
             "suggest",
@@ -275,24 +337,30 @@ class FaBApp(App[None]):
     session_log: rec.SessionLog
     _undo_stack: list[dict]
 
-    def __init__(self, state: GameState, cards_dict: dict[str, Card]) -> None:
+    def __init__(
+        self,
+        state: GameState,
+        cards_dict: dict[str, Card],
+        matchup: Matchup = DEFAULT_MATCHUP,
+    ) -> None:
         super().__init__()
         self.game_state = state
         self.cards = cards_dict
+        self.matchup = matchup
         self.notices = []
         self._undo_stack = []
         self.session_log = rec.SessionLog(
-            hero_a=BRIAR.name,
-            hero_b=ENIGMA.name,
+            hero_a=matchup.hero_a.name,
+            hero_b=matchup.hero_b.name,
             start_time=__import__("datetime").datetime.now().isoformat(timespec="seconds"),
         )
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="body"):
-            yield PlayerPanel("A", BRIAR, "Briar (A) — Atacante", id="panel-a")
+            yield PlayerPanel("A", self.matchup.hero_a, self.matchup.label("A"), id="panel-a")
             yield self._center_panel()
-            yield PlayerPanel("B", ENIGMA, "Enigma (B) — Defensor", id="panel-b")
+            yield PlayerPanel("B", self.matchup.hero_b, self.matchup.label("B"), id="panel-b")
         yield self._notices_area()
         yield Input(id="command-input", placeholder="Digite um comando (help para ajuda)...")
         yield Footer()
@@ -312,7 +380,10 @@ class FaBApp(App[None]):
     def on_mount(self) -> None:
         """Inicializa a tela e mostra boas-vindas."""
         self._log_notice("[bold green]⚔ FaB Silver Age — Assistente de Decisão[/]")
-        self._log_notice("Briar (A) vs Enigma (B) — Turno 1. Comandos: [bold]help[/] para lista.")
+        self._log_notice(
+            f"{self.matchup.label('A')} vs {self.matchup.label('B')} — Turno 1. "
+            "Comandos: [bold]help[/] para lista."
+        )
         self._log_notice('[dim]Mão inicial: adicione cartas com [bold]draw "Nome (cor)"[/].[/]')
         self._refresh_all()
 
@@ -391,7 +462,7 @@ class FaBApp(App[None]):
         """Atualiza placeholder do input com dica contextual."""
         inp = self.query_one("#command-input", Input)
         active = self.game_state.active_player
-        lbl = HERO_LABELS.get(active, active)
+        lbl = self.matchup.label(active)
         inp.placeholder = f"[{lbl}] Digite um comando (help para lista)..."
 
     # ── Processamento de comandos ─────────────────────────────────
@@ -435,6 +506,7 @@ class FaBApp(App[None]):
 
         dispatch = {
             "help": self._cmd_help,
+            "card": self._cmd_card,
             "draw": self._cmd_draw,
             "pitch": self._cmd_pitch,
             "arsenal": self._cmd_arsenal,
@@ -473,6 +545,7 @@ class FaBApp(App[None]):
     def _cmd_help(self, args: list[str]) -> None:
         """Mostra lista de comandos."""
         self._log_notice("[bold underline]Comandos disponíveis:[/]")
+        self._log_notice("  [bold]card[/] <carta>            — mostra detalhes da carta")
         self._log_notice("  [bold]draw[/] <carta>           — adiciona carta à mão do ativo")
         self._log_notice("  [bold]pitch[/] <carta>          — dá pitch de uma carta da mão")
         self._log_notice("  [bold]arsenal[/] <carta>        — coloca carta no arsenal")
@@ -499,6 +572,35 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]undo[/]                    — desfaz a última ação")
         self._log_notice("  [bold]reset[/]                   — reinicia a partida do zero")
         self._log_notice("  [bold]help[/]                    — esta mensagem")
+
+    def _cmd_card(self, args: list[str]) -> None:
+        """card <carta|número> — mostra todos os detalhes de uma carta.
+
+        Aceita nome parcial ("Snatch", "Unmovable (blue)") ou o número da
+        carta na mão do jogador ativo ("1", "2").
+        """
+        if not args:
+            raise ValueError("uso: card <carta ou número da mão>")
+        texto = " ".join(args)
+
+        key: str | None = None
+        if texto.isdigit():
+            p = self.game_state.players[self.game_state.active_player]
+            idx = int(texto) - 1
+            if 0 <= idx < len(p.hand):
+                key = p.hand[idx]
+            else:
+                raise ValueError(f"Índice {texto} fora da mão (1-{len(p.hand)})")
+        else:
+            key = _find_card(texto, self.cards)
+        if key is None:
+            raise ValueError(f"Carta não encontrada: '{texto}'")
+
+        card = self.cards.get(key)
+        if card is None:
+            raise ValueError(f"Carta fora do registro: {key}")
+        for line in _card_details(key, card):
+            self._log_notice(line)
 
     def _cmd_draw(self, args: list[str]) -> None:
         """draw <carta> — adiciona à mão do jogador ativo."""
@@ -559,7 +661,7 @@ class FaBApp(App[None]):
     def _cmd_weapon(self, args: list[str]) -> None:
         """weapon — ataca com a arma."""
         hero_key = self.game_state.players[self.game_state.active_player].hero_key
-        weapon_key = WEAPONS.get(hero_key)
+        weapon_key = self.matchup.weapon_for(hero_key)
         if not weapon_key:
             raise cmb.CombatError(f"Arma não definida para {hero_key}")
         card = self.cards.get(weapon_key)
@@ -644,7 +746,7 @@ class FaBApp(App[None]):
         new_active = self.game_state.active_player
         notices = cmb.start_turn(self.game_state, new_active)
         self._log_notice(
-            f"⏭ Turno {self.game_state.turn} — agora joga {HERO_LABELS.get(new_active, new_active)}"
+            f"⏭ Turno {self.game_state.turn} — agora joga {self.matchup.label(new_active)}"
         )
         for n in notices:
             self._log_notice(f"⚡ {n.text}")
@@ -654,14 +756,14 @@ class FaBApp(App[None]):
         cur = self.game_state.active_player
         new = "B" if cur == "A" else "A"
         self.game_state.active_player = new
-        self._log_notice(f"🔄 Lado ativo: {HERO_LABELS.get(new, new)}")
+        self._log_notice(f"🔄 Lado ativo: {self.matchup.label(new)}")
 
     def _cmd_plan(self, args: list[str]) -> None:
         """plan — mostra sugestão de linha de ataque."""
         side = self.game_state.active_player
         me = self.game_state.players[side]
         hero_key = me.hero_key
-        weapon_key = WEAPONS.get(hero_key)
+        weapon_key = self.matchup.weapon_for(hero_key)
         opp = self.game_state.opponent_of(side)
         opp_life = self.game_state.players[opp].life
 
@@ -673,7 +775,7 @@ class FaBApp(App[None]):
             weapon_key=weapon_key,
         )
         self._log_notice(
-            f"[bold cyan]📋 Plano de ataque:[/] {HERO_LABELS.get(side, side)} "
+            f"[bold cyan]📋 Plano de ataque:[/] {self.matchup.label(side)} "
             f"(AP {me.action_points}, pool {me.pitch_pool}{{r}})"
         )
         if me.action_points <= 0:
@@ -756,7 +858,7 @@ class FaBApp(App[None]):
         """status — log completo do estado."""
         for side in ("A", "B"):
             p = self.game_state.players[side]
-            self._log_notice(f"[bold]--- {HERO_LABELS.get(side, side)} ---[/]")
+            self._log_notice(f"[bold]--- {self.matchup.label(side)} ---[/]")
             self._log_notice(f"  Vida: {p.life}  AP: {p.action_points}  Pool: {p.pitch_pool}")
             self._log_notice(f"  Mão ({len(p.hand)}): {p.hand}")
             self._log_notice(f"  Arsenal: {p.arsenal}")
@@ -792,13 +894,13 @@ class FaBApp(App[None]):
         """reset — reinicia a partida do zero (limpa todo o estado)."""
         # Salva snapshot caso queira desfazer o reset
         self._undo_stack.append(self.game_state.to_dict())
-        self.game_state = new_game(BRIAR, ENIGMA, "A")
+        self.game_state = new_game(self.matchup.hero_a, self.matchup.hero_b, "A")
         self.notices.clear()
         self.query_one("#notices-log", RichLog).clear()
         # Reinicia o log da sessão
         self.session_log.entries.clear()
         self._log_notice("[bold green]🔄 Partida reiniciada![/]")
-        self._log_notice("Briar (A) vs Enigma (B) — Turno 1.")
+        self._log_notice(f"{self.matchup.label('A')} vs {self.matchup.label('B')} — Turno 1.")
 
     # ── Comandos da Fase 4 ────────────────────────────────────
 
@@ -901,11 +1003,14 @@ class FaBApp(App[None]):
 # ── Ponto de entrada ────────────────────────────────────────────────────
 
 
-def launch(state: GameState | None = None, cards: dict[str, Card] | None = None) -> None:
+def launch(
+    state: GameState | None = None,
+    cards: dict[str, Card] | None = None,
+    matchup: Matchup = DEFAULT_MATCHUP,
+) -> None:
     """Inicializa e roda a TUI."""
-
     cards = cards or load_cards()
     if state is None:
-        state = new_game(BRIAR, ENIGMA, "A")
-    app = FaBApp(state, cards)
+        state = new_game(matchup.hero_a, matchup.hero_b, "A")
+    app = FaBApp(state, cards, matchup=matchup)
     app.run()

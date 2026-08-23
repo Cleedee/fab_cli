@@ -23,9 +23,23 @@ A TUI (Textual) é instalada automaticamente com o pacote.
 ## Uso
 
 ```bash
-# Iniciar a interface TUI
+# Iniciar a interface TUI (padrão: Briar vs Enigma)
 fab
+
+# Escolher decks arbitrários (decklists YAML em data/decks/)
+fab --deck-a data/decks/enigma_sa.yaml --deck-b data/decks/briar_sa.yaml
+
+# Escolher quem começa
+fab --first B
+
+# Ajuda da CLI
+fab --help
 ```
+
+Os `--deck-a`/`--deck-b` aceitam qualquer decklist Silver Age em YAML com o
+formato de `data/decks/` (campos `hero`, `arena`, `deck_pool`). O herói,
+a arma e os labels da TUI são derivados automaticamente da decklist; heróis
+novos usam os types do registro de cartas para validar o card-pool.
 
 ### Atalhos de teclado
 
@@ -113,6 +127,7 @@ Exemplo: `prob 3 40 7` → chance de comprar ao menos 1 das 3 cópias em 7 compr
 
 | Comando | Descrição |
 |---|---|
+| `card <carta\|número>` | Mostra detalhes completos de uma carta (custo, poder, texto, keywords) |
 | `status` | Log completo do estado dos dois jogadores e chain |
 | `clear` | Limpa a área de notificações |
 | `undo` | Desfaz a última ação que alterou o estado |

@@ -3,7 +3,14 @@ from pathlib import Path
 import pytest
 
 from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.deck import Decklist, load_decklist, validate
+from fresh_and_blood.deck import (
+    Decklist,
+    allowed_types_for,
+    hero_from_deck,
+    load_decklist,
+    validate,
+    weapon_from_deck,
+)
 
 DECKS_DIR = Path(__file__).resolve().parents[1] / "data" / "decks"
 
@@ -77,3 +84,51 @@ def test_decklist_dataclass_helpers() -> None:
     deck = Decklist(hero="X", source="", arena=["A"], deck_pool={"B (red)": 2})
     assert deck.pool_size == 3
     assert deck.all_keys() == {"A", "B (red)"}
+
+
+def test_hero_from_deck_derives_hero(cards) -> None:
+    deck = load_decklist(DECKS_DIR / "briar_sa.yaml")
+    hero = hero_from_deck(deck, cards)
+    assert hero.name == "Briar, Warden of Thorns"
+    assert hero.life == 20
+    assert hero.intellect == 4
+    assert "Runeblade" in hero.classes
+
+
+def test_weapon_from_deck_returns_first_weapon(cards) -> None:
+    deck = load_decklist(DECKS_DIR / "enigma_sa.yaml")
+    assert weapon_from_deck(deck, cards) == "Cosmo, Scroll of Ancestral Tapestry"
+
+
+def test_allowed_types_fallback_para_heroi_novo(cards) -> None:
+    """Herói não mapeado usa os types do card do herói (menos Hero/Young)."""
+    from fresh_and_blood.models import Card
+
+    novo = Card(
+        key="Nova",
+        name="Nova",
+        color=None,
+        pitch=None,
+        cost=None,
+        power=None,
+        defense=None,
+        types=("Shadow", "Runeblade", "Hero", "Young"),
+        keywords=(),
+        text="",
+        rarity="C",
+        sa_legal=True,
+    )
+    registry = {**cards, novo.key: novo}
+    tipos = allowed_types_for("Nova", registry)
+    assert tipos is not None
+    assert "Shadow" in tipos and "Runeblade" in tipos and "Generic" in tipos
+    assert "Hero" not in tipos and "Young" not in tipos
+
+    deck = Decklist(hero="Nova", source="", arena=[], deck_pool={})
+    hero = hero_from_deck(deck, registry)
+    assert hero.classes == ("Shadow", "Runeblade")
+
+
+def test_weapon_from_deck_none_sem_arma(cards) -> None:
+    deck = Decklist(hero="Enigma", source="", arena=["Blade Beckoner Helm"], deck_pool={})
+    assert weapon_from_deck(deck, cards) is None

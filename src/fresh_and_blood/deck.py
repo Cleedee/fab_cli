@@ -15,16 +15,42 @@ from pathlib import Path
 import yaml
 
 from .carddb import load_cards
-from .models import Card
+from .models import Card, Hero
 
 # Tipos/classes permitidos por herói (subset check do formato).
-# Briar tem essência de Earth e Lightning (sem Ice); Enigma é Mystic Illusionist.
+# Overrides manuais para capturar talents/essências que o dataset não modela
+# (ex.: Briar tem essência de Earth e Lightning nos keywords, não nos types).
+# Heróis fora deste mapa usam fallback automático dos types do card do herói.
 HERO_ALLOWED_TYPES: dict[str, frozenset[str]] = {
     "Briar, Warden of Thorns": frozenset(
         {"Generic", "Elemental", "Runeblade", "Earth", "Lightning", "Hero"}
     ),
     "Enigma": frozenset({"Generic", "Illusionist", "Mystic", "Hero"}),
 }
+
+# Tipos do card de herói que NÃO são classes/talents jogáveis por cartas de deck.
+_HERO_NON_CARD_TYPES = frozenset({"Hero", "Young", "Token"})
+
+# Jovens do formato Silver Age: 20 vida / 4 intelecto (TRP 7.4).
+DEFAULT_YOUNG_LIFE = 20
+DEFAULT_YOUNG_INTELLECT = 4
+
+
+def allowed_types_for(hero_key: str, cards: dict[str, Card] | None = None) -> frozenset[str] | None:
+    """Tipos de carta permitidos para o herói.
+
+    Usa o override manual quando existe; senão deriva dos types do card do
+    herói no registro (ex.: {'Elemental', 'Runeblade'}), adicionando 'Generic'.
+    Retorna None se o herói não está no registro.
+    """
+    if hero_key in HERO_ALLOWED_TYPES:
+        return HERO_ALLOWED_TYPES[hero_key]
+    cards = cards if cards is not None else load_cards()
+    hero = cards.get(hero_key)
+    if hero is None:
+        return None
+    return frozenset({"Generic", *hero.types}) - _HERO_NON_CARD_TYPES
+
 
 MAX_POOL_SIZE = 55
 MAX_COPIES = 2
@@ -70,7 +96,7 @@ def validate(deck: Decklist, cards: dict[str, Card] | None = None) -> list[str]:
     elif "Hero" not in hero.types or "Young" not in hero.types:
         errors.append(f"{deck.hero} não é um herói jovem")
 
-    allowed = HERO_ALLOWED_TYPES.get(deck.hero)
+    allowed = allowed_types_for(deck.hero, cards)
 
     for key in sorted(deck.all_keys()):
         card = cards.get(key)
@@ -94,3 +120,34 @@ def validate(deck: Decklist, cards: dict[str, Card] | None = None) -> list[str]:
         errors.append(f"pool tem {deck.pool_size} cartas (deve ter {MAX_POOL_SIZE})")
 
     return errors
+
+
+def hero_from_deck(deck: Decklist, cards: dict[str, Card] | None = None) -> Hero:
+    """Deriva o objeto Hero de uma decklist a partir do registro de cartas.
+
+    Vida/intelecto usam o padrão de jovem do Silver Age (20/4); classes e
+    talents vêm dos types do card do herói (ex.: Runeblade, Illusionist).
+    """
+    cards = cards if cards is not None else load_cards()
+    card = cards.get(deck.hero)
+    if card is None:
+        raise ValueError(f"herói desconhecido: {deck.hero}")
+    classes = tuple(t for t in card.types if t not in _HERO_NON_CARD_TYPES and t != "Generic")
+    return Hero(
+        key=card.key,
+        name=card.name,
+        life=DEFAULT_YOUNG_LIFE,
+        intellect=DEFAULT_YOUNG_INTELLECT,
+        classes=classes,
+        talents=(),
+    )
+
+
+def weapon_from_deck(deck: Decklist, cards: dict[str, Card] | None = None) -> str | None:
+    """Primeira arma da arena da decklist (chave da carta)."""
+    cards = cards if cards is not None else load_cards()
+    for key in deck.arena:
+        card = cards.get(key)
+        if card is not None and card.is_weapon:
+            return key
+    return None
