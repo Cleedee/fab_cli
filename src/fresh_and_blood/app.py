@@ -421,6 +421,11 @@ class FaBApp(App[None]):
             "prob": self._cmd_prob,
             "status": self._cmd_status,
             "clear": self._cmd_clear,
+            "log": self._cmd_log,
+            "save": self._cmd_save,
+            "load": self._cmd_load,
+            "review": self._cmd_review,
+            "metrics": self._cmd_metrics,
             "": lambda a: None,
         }
         handler = dispatch.get(cmd)
@@ -452,6 +457,11 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]prob[/] <copias> <deck> <compras> [min] — probabilidade")
         self._log_notice("  [bold]status[/]                  — estado completo")
         self._log_notice("  [bold]clear[/]                   — limpa notificações")
+        self._log_notice("  [bold]log[/]                     — exibe histórico da sessão")
+        self._log_notice("  [bold]save[/] [nome]             — salva o log em data/logs/")
+        self._log_notice("  [bold]load[/] [nome]             — carrega sessão anterior")
+        self._log_notice("  [bold]review[/]                  — visão geral do replay")
+        self._log_notice("  [bold]metrics[/]                 — estatísticas da sessão")
         self._log_notice("  [bold]help[/]                    — esta mensagem")
 
     def _cmd_draw(self, args: list[str]) -> None:
