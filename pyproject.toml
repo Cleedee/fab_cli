@@ -3,7 +3,7 @@ name = "fresh-and-blood"
 version = "0.1.0"
 description = "Assistente de decisão para Flesh and Blood (Silver Age) no terminal"
 requires-python = ">=3.11"
-dependencies = ["PyYAML>=6.0"]
+dependencies = ["PyYAML>=6.0", "textual>=8.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.6"]
