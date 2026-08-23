@@ -36,7 +36,7 @@ python scripts/build_cards.py --dataset-dir <caminho>/json/english
 | `carddb.py` | carrega `data/cards.yaml` |
 | `deck.py` | decklists YAML + validação Silver Age (pool=55, ≤2 cópias, classes do herói) |
 | `combat.py` | operações de turno/combate; valida e devolve `Notice`s (triggers manuais) |
-| `cli.py` | placeholder até a Fase 3 |
+| `cli.py` | ponto de entrada (TUI textual) |
 
 Dados: `data/decks/*.yaml` (decklists), `data/cards.yaml` (gerado).
 Overrides para limitações do dataset ficam no dict `OVERRIDES` de `scripts/build_cards.py`
@@ -96,5 +96,5 @@ Overrides para limitações do dataset ficam no dict `OVERRIDES` de `scripts/bui
       `attack.py` (planejador burst/lethal em 3 fases; Look Tuff faz downgrade
       em vez de ser removido quando faltam recursos para o {r} extra;
       limitação: não troca buff jogável por pitch p/ {r} extra)
-- [ ] Fase 3 — TUI Textual
-- [ ] Fase 4 — log de decisões + review pós-jogo
+- [x] Fase 3 — TUI Textual
+- [x] Fase 4 — log de decisões + review pós-jogo

@@ -20,6 +20,7 @@ from fresh_and_blood import attack as atk
 from fresh_and_blood import combat as cmb
 from fresh_and_blood import defense as dfs
 from fresh_and_blood import probabilities as prob
+from fresh_and_blood import recorder as rec
 from fresh_and_blood.carddb import load_cards
 from fresh_and_blood.models import (
     Card,
@@ -49,6 +50,7 @@ ENIGMA = Hero(
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 DECK_DIR = DATA_DIR / "decks"
+LOG_DIR = DATA_DIR / "logs"
 
 # ── Constantes de carta (chaves) ───────────────────────────────────────
 
@@ -252,12 +254,18 @@ class FaBApp(App[None]):
     game_state: GameState
     cards: dict[str, Card]
     notices: list[str]
+    session_log: rec.SessionLog
 
     def __init__(self, state: GameState, cards_dict: dict[str, Card]) -> None:
         super().__init__()
         self.game_state = state
         self.cards = cards_dict
         self.notices = []
+        self.session_log = rec.SessionLog(
+            hero_a=BRIAR.name,
+            hero_b=ENIGMA.name,
+            start_time=__import__("datetime").datetime.now().isoformat(timespec="seconds"),
+        )
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -295,6 +303,15 @@ class FaBApp(App[None]):
         log = self.query_one("#notices-log", RichLog)
         log.write(msg)
 
+    def _record(self, action: str, description: str, **kwargs) -> None:
+        """Registra uma ação no log da sessão."""
+        self.session_log.record(
+            self.game_state,
+            action=action,
+            description=description,
+            **kwargs,
+        )
+
     def _notify(self, msg: str) -> None:
         """Notificação breve (usada para erros)."""
         self._log_notice(f"[red]{msg}[/]")
@@ -316,7 +333,7 @@ class FaBApp(App[None]):
         lines = []
         active = self.game_state.active_player
 
-        # Chain link atual
+        # Chain link ativo
         link = cmb.current_link(self.game_state, active)
         if link:
             card = self.cards.get(link.card_key)
@@ -340,9 +357,13 @@ class FaBApp(App[None]):
         lines.append("")
         lines.append(f"[bold]Oponente:[/] {opp.life}/20 de vida")
 
+        # Log count
+        lines.append("")
+        lines.append(f"[dim]📝 {len(self.session_log.entries)} ações registradas[/]")
+
         # Ajuda rápida
         lines.append("")
-        lines.append("[dim]Comandos rápidos: F1=ajuda, F5=defesa, F6=ataque, Tab=troca[/]")
+        lines.append("[dim]Comandos: F1=ajuda, F5=defesa, F6=ataque, Tab=troca[/]")
 
         self.query_one("#panel-center", Static).update("\n".join(lines))
 
@@ -516,6 +537,7 @@ class FaBApp(App[None]):
         amount = int(args[0])
         n = cmb.boost_link(self.game_state, self.game_state.active_player, amount)
         self._log_notice(n.text)
+        self._record("boost", f"+{amount}{{p}}")
 
     def _cmd_arcane(self, args: list[str]) -> None:
         """arcane <N> — +N arcano no link atual."""
@@ -524,6 +546,7 @@ class FaBApp(App[None]):
         amount = int(args[0])
         n = cmb.set_arcane_on_link(self.game_state, self.game_state.active_player, amount, None)
         self._log_notice(n.text)
+        self._record("arcane", f"+{amount}{{a}}")
 
     def _cmd_defend(self, args: list[str]) -> None:
         """defend <carta> [carta ...] — bloqueia com cartas da mão."""
