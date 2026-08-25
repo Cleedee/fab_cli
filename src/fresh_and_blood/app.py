@@ -600,7 +600,7 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]weapon[/] [1|2]            — ataca com a arma (índice)")
         self._log_notice("  [bold]boost[/] <N>               — +N{p} no link atual")
         self._log_notice("  [bold]arcane[/] <N>              — +N arcano no link atual")
-        self._log_notice("  [bold]defend[/] <carta> [carta] — bloqueia link oponente")
+        self._log_notice("  [bold]defend[/] [auto|N|suggest] — bloqueia link oponente")
         self._log_notice("  [bold]equip[/] <equip>           — usa equipamento p/ defesa")
         self._log_notice("  [bold]resolve[/] [ward=N] [arcane=N] — resolve link")
         self._log_notice("  [bold]next[/]                    — encerra turno / avança")
@@ -762,10 +762,48 @@ class FaBApp(App[None]):
         self._record("arcane", f"+{amount}{{a}}")
 
     def _cmd_defend(self, args: list[str]) -> None:
-        """defend <carta> [carta ...] — bloqueia com cartas da mão."""
+        """defend [auto|N|suggest] ou defend <carta> [carta ...] — bloqueia link.
+
+        Modes:
+          defend           — abre Sugestão #1 automaticamente
+          defend auto      — aplica melhor sugestão (cartas + equipamento)
+          defend N         — aplica sugestão #N
+          defend suggest   — mostra sugestões (igual ao comando suggest)
+          defend <carta>   — bloqueia com cartas da mão (comportamento original)
+        """
+        attacker = self.game_state.active_player
+        defender = self.game_state.opponent_of(attacker)
+        link = cmb.current_link(self.game_state, attacker)
+
         if not args:
-            raise ValueError("uso: defend <carta> [carta ...]")
-        defender = self.game_state.opponent_of(self.game_state.active_player)
+            # Sem argumentos: aplica sugestão #1 automaticamente
+            if link is None:
+                self._log_notice("[yellow]Nenhum ataque ativo para defender.[/]")
+                return
+            self._apply_defense_suggestion(defender, link, 1)
+            return
+
+        arg = args[0].lower()
+
+        if arg == "suggest":
+            self._cmd_suggest([])
+            return
+
+        if arg == "auto":
+            if link is None:
+                self._log_notice("[yellow]Nenhum ataque ativo para defender.[/]")
+                return
+            self._apply_defense_suggestion(defender, link, 1)
+            return
+
+        if arg.isdigit():
+            if link is None:
+                self._log_notice("[yellow]Nenhum ataque ativo para defender.[/]")
+                return
+            self._apply_defense_suggestion(defender, link, int(arg))
+            return
+
+        # Modo original: defend <carta> [carta ...]
         keys = []
         for a in args:
             key = self._resolve_card(a, side=defender)
@@ -777,6 +815,63 @@ class FaBApp(App[None]):
             "defend",
             f"Defendeu com {', '.join(keys)}",
             result=[n.text for n in notices],
+        )
+
+    def _apply_defense_suggestion(self, defender: str, link, suggestion_index: int) -> None:
+        """Aplica uma sugestão de defesa por índice (1-based)."""
+        p = self.game_state.players[defender]
+        hand = {k: self.cards[k] for k in p.hand if k in self.cards}
+        equip = {
+            k: (self.cards[k].defense or 0)
+            for k in p.equipment_uses
+            if k not in p.equipment_destroyed
+            and k not in p.equipment_used_this_turn
+            and k in self.cards
+            and self.cards[k].defense
+        }
+        earth_bonus = bool(p.auras.get(cmb.EMBODIMENT_EARTH))
+        opts = dfs.suggest_defense(
+            link.damage_remaining,
+            hand,
+            equip or None,
+            dominate=link.dominate,
+            top=5,
+            earth_bonus=earth_bonus,
+        )
+        if not opts:
+            self._log_notice("[yellow]Nenhuma opção de defesa disponível.[/]")
+            return
+        idx = suggestion_index - 1
+        if idx >= len(opts):
+            self._log_notice(
+                f"[yellow]Sugestão #{suggestion_index} não existe (máximo: {len(opts)}).[/]"
+            )
+            return
+        opt = opts[idx]
+
+        # Aplica cartas da mão
+        if opt.hand_cards:
+            notices = cmb.defend_link(self.game_state, defender, list(opt.hand_cards), self.cards)
+            for n in notices:
+                self._log_notice(f"🛡 {n.text}")
+            self._record(
+                "defend",
+                f"Defendeu com {', '.join(opt.hand_cards)}",
+                result=[n.text for n in notices],
+            )
+
+        # Aplica equipamentos
+        for eq_key in opt.equipment:
+            gained = cmb.use_equipment_defense(self.game_state, defender, eq_key, self.cards)
+            self._log_notice(f"🛡 Equipamento {eq_key}: +{gained} de bloqueio.")
+            self._record("equip", f"{eq_key}: +{gained} de bloqueio")
+
+        hand_str = ", ".join(opt.hand_cards) if opt.hand_cards else "(nenhuma)"
+        equip_str = ", ".join(opt.equipment) if opt.equipment else "(nenhum)"
+        self._log_notice(
+            f"  [bold]Sugestão #{suggestion_index}:[/] "
+            f"Mão: {hand_str}  Equip: {equip_str}  "
+            f"Bloqueio: {opt.block_total}  Dano: {opt.damage_taken}"
         )
 
     def _cmd_equip(self, args: list[str]) -> None:
