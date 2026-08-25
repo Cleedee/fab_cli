@@ -345,6 +345,10 @@ class FaBApp(App[None]):
             "review",
             "metrics",
             "undo",
+            "replay_next",
+            "replay_prev",
+            "replay_status",
+            "replay_exit",
         }
     )
 
@@ -368,6 +372,8 @@ class FaBApp(App[None]):
         self.matchup = matchup
         self.notices = []
         self._undo_stack = []
+        self._replay_index: int = 0
+        self._replay_mode: bool = False
         self.session_log = rec.SessionLog(
             hero_a=matchup.hero_a.name,
             hero_b=matchup.hero_b.name,
@@ -565,6 +571,11 @@ class FaBApp(App[None]):
             "load": self._cmd_load,
             "review": self._cmd_review,
             "metrics": self._cmd_metrics,
+            "replay": self._cmd_replay,
+            "replay_next": self._cmd_replay_next,
+            "replay_prev": self._cmd_replay_prev,
+            "replay_status": self._cmd_replay_status,
+            "replay_exit": self._cmd_replay_exit,
             "undo": self._cmd_undo,
             "reset": self._cmd_reset,
             "": lambda a: None,
@@ -604,6 +615,13 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]load[/] [nome]             — carrega sessão anterior")
         self._log_notice("  [bold]review[/]                  — visão geral do replay")
         self._log_notice("  [bold]metrics[/]                 — estatísticas da sessão")
+        self._log_notice(
+            "  [bold]replay[/] [N]              — entra no modo replay (passo a passo)"
+        )
+        self._log_notice("  [bold]replay_next[/]             — próxima entrada do replay")
+        self._log_notice("  [bold]replay_prev[/]             — entrada anterior do replay")
+        self._log_notice("  [bold]replay_status[/]           — estado completo da entrada atual")
+        self._log_notice("  [bold]replay_exit[/]             — sai do modo replay")
         self._log_notice("  [bold]undo[/]                    — desfaz a última ação")
         self._log_notice("  [bold]reset[/]                   — reinicia a partida do zero")
         self._log_notice("  [bold]help[/]                    — esta mensagem")
@@ -645,6 +663,7 @@ class FaBApp(App[None]):
         p = self.game_state.players[self.game_state.active_player]
         p.hand.append(key)
         self._log_notice(f"{self.game_state.active_player} comprou: {key}")
+        self._record("draw", f"{self.game_state.active_player} comprou {key}")
 
     def _cmd_pitch(self, args: list[str]) -> None:
         """pitch <carta> — dá pitch da mão."""
@@ -653,6 +672,7 @@ class FaBApp(App[None]):
         key = self._resolve_card(" ".join(args))
         val = cmb.pitch(self.game_state, self.game_state.active_player, key, self.cards)
         self._log_notice(f"{key} pichada: +{val}{{r}}")
+        self._record("pitch", f"{key} → +{val}{{r}}")
 
     def _cmd_arsenal(self, args: list[str]) -> None:
         """arsenal <carta> — coloca no arsenal."""
@@ -661,6 +681,7 @@ class FaBApp(App[None]):
         key = self._resolve_card(" ".join(args))
         cmb.place_arsenal(self.game_state, self.game_state.active_player, key)
         self._log_notice(f"{key} colocada no arsenal.")
+        self._record("arsenal", f"{key} → arsenal")
 
     def _cmd_play(self, args: list[str]) -> None:
         """play <carta> — joga non-attack action."""
@@ -670,6 +691,7 @@ class FaBApp(App[None]):
         notices = cmb.play_action(self.game_state, self.game_state.active_player, key, self.cards)
         for n in notices:
             self._log_notice(f"⚡ {n.text}")
+        self._record("play", f"Jogou {key}", result=[n.text for n in notices])
 
     def _cmd_attack(self, args: list[str]) -> None:
         """attack <carta> [dominate=1] — declara ataque."""
@@ -688,9 +710,11 @@ class FaBApp(App[None]):
             self.cards,
             dominate=dominate,
         )
-        self._log_notice(
-            f"⚔ Ataque declarado: {key} ({link.total_damage}{{p}})"
-            f"{' [yellow]Dominate[/]' if dominate else ''}"
+        dom_str = " [yellow]Dominate[/]" if dominate else ""
+        self._log_notice(f"⚔ Ataque declarado: {key} ({link.total_damage}{{p}}){dom_str}")
+        self._record(
+            "attack",
+            f"{key} ({link.total_damage}{{p}}){dom_str}",
         )
 
     def _cmd_weapon(self, args: list[str]) -> None:
@@ -717,6 +741,7 @@ class FaBApp(App[None]):
             go_again_earned=False,
         )
         self._log_notice(f"⚔ Ataque de arma: {weapon_key} ({link.total_damage}{{p}})")
+        self._record("weapon", f"{weapon_key} ({link.total_damage}{{p}})")
 
     def _cmd_boost(self, args: list[str]) -> None:
         """boost <N> — +N power no link atual."""
@@ -748,6 +773,11 @@ class FaBApp(App[None]):
         notices = cmb.defend_link(self.game_state, defender, keys, self.cards)
         for n in notices:
             self._log_notice(f"🛡 {n.text}")
+        self._record(
+            "defend",
+            f"Defendeu com {', '.join(keys)}",
+            result=[n.text for n in notices],
+        )
 
     def _cmd_equip(self, args: list[str]) -> None:
         """equip <nome> — usa equipamento para defesa."""
@@ -757,6 +787,7 @@ class FaBApp(App[None]):
         key = self._resolve_card(" ".join(args), side=defender)
         gained = cmb.use_equipment_defense(self.game_state, defender, key, self.cards)
         self._log_notice(f"🛡 Equipamento {key}: +{gained} de bloqueio.")
+        self._record("equip", f"{key}: +{gained} de bloqueio")
 
     def _cmd_resolve(self, args: list[str]) -> None:
         """resolve [ward=N] [arcane=N] — resolve o link atual."""
@@ -773,12 +804,18 @@ class FaBApp(App[None]):
             ward_prevented=ward,
             arcane_prevented=arcane_prevented,
         )
+        hit_str = "[red]ACERTOU[/]" if result["hit"] else "[blue]BLOQUEADO[/]"
         self._log_notice(
             f"💥 Resolvido: {result['physical']}{{p}} físico + {result['arcane']}{{a}} arcano"
-            f" → {'[red]ACERTOU[/]' if result['hit'] else '[blue]BLOQUEADO[/]'}"
+            f" → {hit_str}"
         )
         for n in result["notices"]:
             self._log_notice(f"⚡ {n.text}")
+        self._record(
+            "resolve",
+            f"{result['physical']}{{p}} + {result['arcane']}{{a}} → {'acertou' if result['hit'] else 'bloqueado'}",
+            result=[n.text for n in result["notices"]],
+        )
 
     def _cmd_next(self, args: list[str]) -> None:
         """next — encerra o turno do ativo e inicia o do oponente."""
@@ -790,6 +827,10 @@ class FaBApp(App[None]):
         )
         for n in notices:
             self._log_notice(f"⚡ {n.text}")
+        self._record(
+            "next",
+            f"Turno {self.game_state.turn} → {self.matchup.label(new_active)}",
+        )
 
     def _cmd_switch(self, args: list[str]) -> None:
         """switch — troca o lado 'ativo' (quem ataca/age)."""
@@ -797,6 +838,7 @@ class FaBApp(App[None]):
         new = "B" if cur == "A" else "A"
         self.game_state.active_player = new
         self._log_notice(f"🔄 Lado ativo: {self.matchup.label(new)}")
+        self._record("switch", f"Ativo: {self.matchup.label(new)}")
 
     def _cmd_plan(self, args: list[str]) -> None:
         """plan — mostra sugestão de linha de ataque."""
@@ -867,13 +909,15 @@ class FaBApp(App[None]):
         for i, opt in enumerate(opts, 1):
             hand_str = ", ".join(opt.hand_cards) if opt.hand_cards else "(nenhuma)"
             equip_str = ", ".join(opt.equipment) if opt.equipment else "(nenhum)"
+            eff_str = "inf" if opt.efficiency == float("inf") else f"{opt.efficiency:.1f}"
             self._log_notice(
                 f"  {i}. "
                 f"Mão: {hand_str}  "
                 f"Equip: {equip_str}  "
                 f"Bloqueio: {opt.block_total}  "
                 f"Dano: {opt.damage_taken}  "
-                f"Valor: {opt.value_lost:.1f}"
+                f"Valor: {opt.value_lost:.1f}  "
+                f"Eficiência: {eff_str}"
             )
 
     def _cmd_prob(self, args: list[str]) -> None:
@@ -996,6 +1040,110 @@ class FaBApp(App[None]):
         m = rvw.compute_metrics(self.session_log)
         for line in m.to_lines():
             self._log_notice(line)
+
+    # ── Replay interativo ───────────────────────────────────────
+
+    def _cmd_replay(self, args: list[str]) -> None:
+        """replay [N] — entra no modo replay ou pula para a entrada N."""
+        if not self.session_log.entries:
+            self._log_notice("[yellow]Nenhuma ação registrada para replay.[/]")
+            return
+        if args and args[0].isdigit():
+            idx = int(args[0]) - 1
+            if 0 <= idx < len(self.session_log.entries):
+                self._replay_index = idx
+                self._replay_mode = True
+                self._show_replay_entry()
+            else:
+                self._log_notice(
+                    f"[yellow]Índice {args[0]} fora do intervalo "
+                    f"(1-{len(self.session_log.entries)}).[/]"
+                )
+        else:
+            self._replay_index = 0
+            self._replay_mode = True
+            self._log_notice(f"[bold]🎬 Modo Replay — {len(self.session_log.entries)} ações[/]")
+            self._log_notice(
+                "[dim]Comandos: replay_next, replay_prev, replay_status, replay_exit[/]"
+            )
+            self._show_replay_entry()
+
+    def _cmd_replay_next(self, args: list[str]) -> None:
+        """replay_next — avança para a próxima entrada do replay."""
+        if not self._replay_mode:
+            self._log_notice("[yellow]Use 'replay' para entrar no modo replay.[/]")
+            return
+        if self._replay_index < len(self.session_log.entries) - 1:
+            self._replay_index += 1
+            self._show_replay_entry()
+        else:
+            self._log_notice("[dim]Fim do replay.[/]")
+
+    def _cmd_replay_prev(self, args: list[str]) -> None:
+        """replay_prev — volta para a entrada anterior do replay."""
+        if not self._replay_mode:
+            self._log_notice("[yellow]Use 'replay' para entrar no modo replay.[/]")
+            return
+        if self._replay_index > 0:
+            self._replay_index -= 1
+            self._show_replay_entry()
+        else:
+            self._log_notice("[dim]Início do replay.[/]")
+
+    def _cmd_replay_status(self, args: list[str]) -> None:
+        """replay_status — mostra estado completo da entrada atual."""
+        if not self._replay_mode:
+            self._log_notice("[yellow]Use 'replay' para entrar no modo replay.[/]")
+            return
+        if not self.session_log.entries:
+            return
+        entry = self.session_log.entries[self._replay_index]
+        self._log_notice(
+            f"[bold]--- Estado na entrada {self._replay_index + 1}/"
+            f"{len(self.session_log.entries)} ---[/]"
+        )
+        self._log_notice(
+            f"  Turno: {entry.turn}  |  Lado: {entry.active_player}  |  Ação: {entry.action}"
+        )
+        self._log_notice(f"  Descrição: {entry.description}")
+        if entry.suggestions:
+            for s in entry.suggestions:
+                self._log_notice(f"  [dim]💡 {s}[/]")
+        if entry.result:
+            for r in entry.result:
+                self._log_notice(f"  [dim]→ {r}[/]")
+        # Mostra resumo do estado
+        try:
+            snap = GameState.from_dict(entry.state_snapshot)
+            for side in ("A", "B"):
+                p = snap.players[side]
+                self._log_notice(
+                    f"  {side}: vida={p.life} AP={p.action_points} mão={len(p.hand)} cartas"
+                )
+        except (KeyError, TypeError, ValueError):
+            self._log_notice("  [dim](snapshot indisponível)[/]")
+
+    def _cmd_replay_exit(self, args: list[str]) -> None:
+        """replay_exit — sai do modo replay."""
+        self._replay_mode = False
+        self._log_notice("[dim]Saiu do modo replay.[/]")
+
+    def _show_replay_entry(self) -> None:
+        """Exibe a entrada atual do replay."""
+        entry = self.session_log.entries[self._replay_index]
+        ts = entry.timestamp[-8:]
+        side_label = entry.active_player
+        self._log_notice(
+            f"[bold]▶ [{self._replay_index + 1}/{len(self.session_log.entries)}][/] "
+            f"[dim]{ts}[/] T{entry.turn}[{side_label}] "
+            f"[bold]{entry.action}[/] — {entry.description}"
+        )
+        if entry.suggestions:
+            for s in entry.suggestions:
+                self._log_notice(f"  [dim]💡 {s}[/]")
+        if entry.result:
+            for r in entry.result:
+                self._log_notice(f"  [dim]→ {r}[/]")
 
     # ── Helpers ──────────────────────────────────────────────────
 

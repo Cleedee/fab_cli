@@ -148,3 +148,115 @@ def test_snapshot_restaura_estado_completo(session, state, tmp_path):
     assert restored.players["B"].life == 15
     assert restored.active_player == "B"
     assert restored.turn == 4
+
+
+# ---------------------------------------------------------------------------
+# Testes de recording completo (todas as ações mutantes)
+# ---------------------------------------------------------------------------
+def test_registra_todos_tipos_de_acao(session, state):
+    """Todas as ações mutantes devem gerar entradas no log."""
+    acoes = [
+        ("draw", "Comprou Snatch (red)"),
+        ("pitch", "Snatch (red) → +1{r}"),
+        ("arsenal", "Snatch (red) → arsenal"),
+        ("play", "Jogou Snatch (red)"),
+        ("attack", "Snatch (red) (4{p})"),
+        ("weapon", "Star Fall (1{p})"),
+        ("boost", "+2{p}"),
+        ("arcane", "+1{a}"),
+        ("defend", "Defendeu com Snatch (red)"),
+        ("equip", "Blade Beckoner Helm: +1 de bloqueio"),
+        ("resolve", "3{p} + 0{a} → acertou"),
+        ("next", "Turno 2 → Enigma (B)"),
+        ("switch", "Ativo: Enigma (B)"),
+    ]
+    for action, desc in acoes:
+        entry = session.record(state, action=action, description=desc)
+        assert entry.action == action
+    assert len(session.entries) == len(acoes)
+
+
+def test_registra_com_result_e_suggestions(session, state):
+    """Entradas podem ter result e suggestions simultaneamente."""
+    entry = session.record(
+        state,
+        action="resolve",
+        description="3{p} + 1{a} → acertou",
+        result=["On-hit: conferir efeitos", "Embodiment criado"],
+        suggestions=["Considere usar equipment"],
+    )
+    assert entry.result == ["On-hit: conferir efeitos", "Embodiment criado"]
+    assert entry.suggestions == ["Considere usar equipment"]
+
+
+def test_sequencia_de_acoes_preserva_ordem(session, state):
+    """Ações registradas mantêm a ordem cronológica."""
+    session.record(state, action="draw", description="turno 1 draw")
+    state.turn = 2
+    session.record(state, action="attack", description="turno 2 attack")
+    state.turn = 3
+    session.record(state, action="resolve", description="turno 3 resolve")
+
+    assert session.entries[0].turn == 1
+    assert session.entries[1].turn == 2
+    assert session.entries[2].turn == 3
+    assert session.entries[0].action == "draw"
+    assert session.entries[1].action == "attack"
+    assert session.entries[2].action == "resolve"
+
+
+def test_snapshot_cada_entrada(state):
+    """Cada entrada deve conter snapshot independente do estado."""
+    log = SessionLog(hero_a="Briar", hero_b="Enigma", start_time="2026-01-01T00:00:00")
+
+    state.players["A"].hand = ["Card1"]
+    log.record(state, action="draw", description="draw 1")
+
+    state.players["A"].hand = ["Card1", "Card2"]
+    state.turn = 2
+    log.record(state, action="draw", description="draw 2")
+
+    snap1 = GameState.from_dict(log.entries[0].state_snapshot)
+    snap2 = GameState.from_dict(log.entries[1].state_snapshot)
+
+    assert snap1.players["A"].hand == ["Card1"]
+    assert snap1.turn == 1
+    assert snap2.players["A"].hand == ["Card1", "Card2"]
+    assert snap2.turn == 2
+
+
+def test_replay_summary_acoes_completas(session, state):
+    """replay_summary mostra todas as ações com formatação correta."""
+    session.record(state, action="draw", description="Comprou A")
+    session.record(state, action="attack", description="Atacou B")
+    session.record(state, action="resolve", description="Resolveu")
+
+    lines = replay_summary(session)
+    text = "\n".join(lines)
+    assert "draw" in text
+    assert "attack" in text
+    assert "resolve" in text
+
+
+def test_save_load_roundtrip_com_todas_acoes(session, state, tmp_path):
+    """Save/load preserva todas as entradas e seus campos."""
+    session.record(state, action="draw", description="draw")
+    session.record(
+        state,
+        action="attack",
+        description="attack",
+        result=["dano"],
+        suggestions=["sug"],
+    )
+    session.record(state, action="next", description="next turn")
+
+    path = tmp_path / "completo.json"
+    save_session(session, path)
+    loaded = load_session(path)
+
+    assert len(loaded.entries) == 3
+    assert loaded.entries[0].action == "draw"
+    assert loaded.entries[1].action == "attack"
+    assert loaded.entries[1].result == ["dano"]
+    assert loaded.entries[1].suggestions == ["sug"]
+    assert loaded.entries[2].action == "next"
