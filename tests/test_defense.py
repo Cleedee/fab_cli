@@ -129,3 +129,21 @@ def test_pitch_preenche_para_cards_equipment():
     # Blade Beckoner Helm: equipment, pitch None → pitch contribui 0
     helm = cards["Blade Beckoner Helm"]
     assert card_value(helm, w) == w.base  # sem attack, sem GA, sem DR, pitch=0
+
+
+def test_cycle_score_combina_defesa_e_ofensiva():
+    """cycle_score = dano prevenido + poder de ataque restante na mão."""
+    cards = load_cards()
+    # Snatch (red, attack, power 4) + Sizzle (red, non-attack, power None).
+    # Bloquear com Sizzle → sobra Snatch (power 4) → cycle = 2(prevenido) + 4 = 6
+    # Bloquear com Snatch → sobra Sizzle (power None) → cycle = 2(prevenido) + 0 = 2
+    hand = {"Snatch (red)": cards["Snatch (red)"], "Sizzle (red)": cards["Sizzle (red)"]}
+    opts = suggest_defense(2, hand)
+    sizzle_opts = [
+        o for o in opts if "Sizzle (red)" in o.hand_cards and "Snatch (red)" not in o.hand_cards
+    ]
+    snatch_opts = [
+        o for o in opts if "Snatch (red)" in o.hand_cards and "Sizzle (red)" not in o.hand_cards
+    ]
+    assert sizzle_opts and snatch_opts
+    assert sizzle_opts[0].cycle_score > snatch_opts[0].cycle_score

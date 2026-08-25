@@ -919,7 +919,8 @@ class FaBApp(App[None]):
                 f"Bloqueio: {opt.block_total}  "
                 f"Dano: {opt.damage_taken}  "
                 f"Valor: {opt.value_lost:.1f}  "
-                f"Eficiência: {eff_str}"
+                f"Eficiência: {eff_str}  "
+                f"Ciclo: {opt.cycle_score:.1f}"
             )
 
     def _cmd_prob(self, args: list[str]) -> None:

@@ -60,6 +60,7 @@ class DefenseOption:
     block_total: int
     damage_taken: int
     value_lost: float
+    offense_remaining: float = 0.0
 
     @property
     def efficiency(self) -> float:
@@ -72,6 +73,17 @@ class DefenseOption:
             return float("inf")
         prevented = max(0, self.block_total - self.damage_taken)
         return prevented / self.value_lost
+
+    @property
+    def cycle_score(self) -> float:
+        """Pontuação do ciclo do turno: dano prevenido + ofensiva restante.
+
+        Combina defesa (quanto dano é bloqueado) com ofensiva do próximo
+        turno (poder das cartas de ataque que permanecem na mão). Quanto
+        maior, melhor o equilíbrio defesa/ataque no ciclo completo.
+        """
+        prevented = max(0, self.block_total - self.damage_taken)
+        return prevented + self.offense_remaining
 
 
 def _dominate_ok(cards_and_eq: list[tuple[str, bool]]) -> bool:
@@ -160,9 +172,13 @@ def suggest_defense(
         ]
 
     options: list[DefenseOption] = []
+    hand_set = set(hand)
     for hand_subset, hand_block, hand_lost in _enumerate_hand(
         hand, incoming_damage, dominate, weights, earth_bonus=earth_bonus
     ):
+        used = set(hand_subset)
+        remaining_keys = hand_set - used
+        offense = sum((hand[k].power or 0) for k in remaining_keys if hand[k].is_attack)
         for eq_subset in equip_options:
             combined = [(k, False) for k in hand_subset] + [(k, False) for k in eq_subset]
             if dominate and not _dominate_ok(combined):
@@ -177,9 +193,18 @@ def suggest_defense(
                     block_total=block_total,
                     damage_taken=max(0, incoming_damage - block_total),
                     value_lost=value_lost,
+                    offense_remaining=offense,
                 )
             )
-    options.sort(key=lambda o: (o.damage_taken, o.value_lost, len(o.hand_cards), len(o.equipment)))
+    options.sort(
+        key=lambda o: (
+            o.damage_taken,
+            o.value_lost,
+            -o.cycle_score,
+            len(o.hand_cards),
+            len(o.equipment),
+        )
+    )
     seen: set[tuple] = set()
     unique: list[DefenseOption] = []
     for opt in options:
