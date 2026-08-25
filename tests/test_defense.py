@@ -1,7 +1,7 @@
 """Testes do sugeridor de defesa."""
 
 from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.defense import suggest_defense
+from fresh_and_blood.defense import ValueWeights, card_value, suggest_defense
 
 
 def test_bloqueio_total_mais_barato():
@@ -86,3 +86,46 @@ def test_earth_bonus_so_para_non_attack_actions():
     opts = suggest_defense(3, hand, earth_bonus=True)
     assert opts[0].damage_taken == 1
     assert opts[0].block_total == 2
+
+
+def test_pitch_influi_no_valor_da_carta():
+    """Carta azul (pitch 3) tem custo de oportunidade maior que vermelha (pitch 1)."""
+    cards = load_cards()
+    w = ValueWeights()
+    blue_card = cards["Unmovable (blue)"]  # DR, def 3, pitch 3
+    red_card = cards["Sizzle (red)"]  # attack action, def 2, pitch 1
+    assert card_value(blue_card, w) > card_value(red_card, w)
+
+
+def test_pitch_weight_zero_ignora_pitch():
+    """Com pitch_weight=0, o pitch não influencia o valor."""
+    cards = load_cards()
+    w = ValueWeights(pitch_weight=0)
+    # Big Blue Sky (blue): DR, def 2, pitch 3, cost 0 → value = 1 + 0.25 = 1.25
+    # Snatch (red): attack, def 2, pitch 1, cost 0 → value = 1 + 1.5 = 2.5
+    blue_dr = cards["Big Blue Sky (blue)"]
+    red_atk = cards["Snatch (red)"]
+    assert card_value(blue_dr, w) == 1.25  # base + DR only
+    assert card_value(red_atk, w) == 2.5  # base + attack only
+
+
+def test_efficiency_propriedade():
+    """Eficiência = dano prevenido / valor perdido; inf quando valor=0."""
+    cards = load_cards()
+    hand = {"Sizzle (red)": cards["Sizzle (red)"]}
+    opts = suggest_defense(4, hand)
+    for opt in opts:
+        if opt.value_lost == 0:
+            assert opt.efficiency == float("inf")
+        else:
+            prevented = max(0, opt.block_total - opt.damage_taken)
+            assert opt.efficiency == prevented / opt.value_lost
+
+
+def test_pitch_preenche_para_cards_equipment():
+    """Equipamento (pitch None) não contribui com pitch no valor."""
+    cards = load_cards()
+    w = ValueWeights()
+    # Blade Beckoner Helm: equipment, pitch None → pitch contribui 0
+    helm = cards["Blade Beckoner Helm"]
+    assert card_value(helm, w) == w.base  # sem attack, sem GA, sem DR, pitch=0

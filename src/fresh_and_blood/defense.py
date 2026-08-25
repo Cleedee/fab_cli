@@ -25,13 +25,19 @@ class ValueWeights:
     cost_threshold: int = 3
     expensive_bonus: float = 1.0
     dr_bonus: float = 0.25
+    pitch_weight: float = 0.5
 
 
 DEFAULT_WEIGHTS = ValueWeights()
 
 
 def card_value(card: Card, w: ValueWeights = DEFAULT_WEIGHTS) -> float:
-    """Valor heurístico de manter a carta na mão (quanto maior, menos queremos gastar)."""
+    """Valor heurístico de manter a carta na mão (quanto maior, menos queremos gastar).
+
+    Pitch (ciclo de recurso) é o maior custo de oportunidade: uma carta azul
+    (pitch 3) custa 3x mais recursos do que uma vermelha (pitch 1). O peso
+    ``pitch_weight`` controla quanto essa diferença impacta no valor.
+    """
     value = w.base
     if card.is_attack:
         value += w.attack_bonus
@@ -41,6 +47,7 @@ def card_value(card: Card, w: ValueWeights = DEFAULT_WEIGHTS) -> float:
         value += w.expensive_bonus
     if "Defense Reaction" in card.types:
         value += w.dr_bonus
+    value += (card.pitch or 0) * w.pitch_weight
     return value
 
 
@@ -53,6 +60,18 @@ class DefenseOption:
     block_total: int
     damage_taken: int
     value_lost: float
+
+    @property
+    def efficiency(self) -> float:
+        """Eficiência do bloqueio: dano prevenido / valor perdido.
+
+        Quanto maior, mais dano é prevenido por unidade de valor gasto.
+        ``inf`` quando ``value_lost == 0`` (bloqueio gratuito com equipamento).
+        """
+        if self.value_lost == 0:
+            return float("inf")
+        prevented = max(0, self.block_total - self.damage_taken)
+        return prevented / self.value_lost
 
 
 def _dominate_ok(cards_and_eq: list[tuple[str, bool]]) -> bool:
