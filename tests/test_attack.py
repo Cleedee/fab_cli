@@ -245,3 +245,19 @@ def test_sem_arsenal_quando_ja_ocupado(state):
     a.arsenal = "Sigil of Suffering (red)"
     plan = plan_attack(state, "A", cards)
     assert plan.arsenal_suggestion is None
+
+
+def test_multi_plan_escolhe_maior_dano(state):
+    """Multi-plan: com 2 ataques sem GA, testa qual primeiro maximiza dano."""
+    cards = load_cards()
+    a = state.players["A"]
+    # Arcanic Crackle (red, power 3, no GA) + Enigma Chimera (red, power 8, no GA).
+    # Com 2 AP: ambos jogáveis. Multi-plan tenta cada um como primeiro.
+    # Chimera primeiro → 8+3=11. Crackle primeiro → 3+8=11.
+    # Empate → mantém o primeiro candidato (Crackle como big_non_ga).
+    a.hand = ["Arcanic Crackle (red)", "Enigma Chimera (red)"]
+    a.action_points = 2
+    a.pitch_pool = 5  # suficiente para ambos (custo 0)
+    plan = plan_attack(state, "A", cards)
+    assert plan.total == 11
+    assert len(plan.sequence) == 2

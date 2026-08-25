@@ -7,7 +7,9 @@ Estratégia em três fases:
    na mão, corta do plano o ataque jogado de menor poder (vira pitch).
 3. Reavalia dano físico/arcano/AP da sequência final, de forma determinística.
 
-O plano é ESTIMATIVA para apoio a decisão, não simulador de regras completo.
+Multi-plan: tenta cada ataque como primeiro (excluindo buffs) e escolhe a
+sequência com maior dano total. O plano é ESTIMATIVA para apoio a decisão,
+não simulador de regras completo.
 """
 
 from dataclasses import dataclass, field
@@ -109,52 +111,31 @@ def _ap_left(player, hand: dict[str, Card], sequence: list[str]) -> int:
     return ap
 
 
-def plan_attack(
-    state: GameState,
-    side: str,
+def _build_plan_from_order(
+    me,
+    hand: dict[str, Card],
     cards: dict[str, Card],
-    *,
-    opponent_life: int | None = None,
-    weapon_key: str | None = None,
+    weapon_key: str | None,
+    life: int,
+    intended: list[str],
+    original_notes: list[str],
 ) -> AttackPlan:
-    """Monta a linha de jogo que maximiza dano físico+arcano do turno.
+    """Constrói um plano completo a partir de uma sequência pretendida.
 
-    Considera mão + arsenal, recursos (pitch_pool + pitches possíveis),
-    action points, Go Again inato, Embodiment of Lightning e a arma
-    once-per-turn (`weapon_key` vem da decklist do jogador).
+    Executa as 3 fases (sequência, viabilidade, avaliação) + arma + pitch +
+    arsenal, retornando o AttackPlan avaliado.
     """
-    me = state.players[side]
-    other_side = next(s for s in state.players if s != side)
-    life = opponent_life if opponent_life is not None else state.players[other_side].life
-
     plan = AttackPlan()
-    plan.notes.extend(ASSUMPTIONS)
-
-    hand: dict[str, Card] = {}
-    for key in [*me.hand, *([me.arsenal] if me.arsenal else [])]:
-        if key not in cards:
-            raise ValueError(f"carta ausente do registro: {key}")
-        hand[key] = cards[key]
-
-    # ---- Fase 1: sequência pretendida -------------------------------------
-    attacks = [k for k, c in hand.items() if c.is_attack]
-    buffs = [k for k, c in hand.items() if _is_buff(c)]
-    big_non_ga = max(
-        (k for k in attacks if "Go again" not in hand[k].keywords),
-        key=lambda k: hand[k].power or 0,
-        default=None,
-    )
-    rest = [k for k in attacks if k != big_non_ga]
-    rest.sort(key=lambda k: ("Go again" not in hand[k].keywords, -(hand[k].power or 0)))
-    intended = buffs + ([big_non_ga] if big_non_ga else []) + rest
+    plan.notes.extend(original_notes)
 
     ap = me.action_points
     aura_ga = "Embodiment of Lightning" in me.auras
     sequence: list[str] = []
-    played: set[str] = set()
+    played_set: set[str] = set()
     costs: dict[str, int] = {}
     pay_extra_for: set[str] = set()
 
+    # ---- Fase 1: monta sequência pretendida --------------------------------
     for key in intended:
         card = hand[key]
         if ap < 1:
@@ -169,32 +150,28 @@ def plan_attack(
         if innate_ga or used_aura:
             ap += 1
         sequence.append(key)
-        played.add(key)
+        played_set.add(key)
         cost = card.cost or 0
-        # Decide já sobre o {r} extra do Look Tuff (revisado na fase 2 se faltar recurso).
         if card.name == LOOK_TUFF:
-            potential = me.pitch_pool + sum(hand[k].pitch or 0 for k in hand if k not in played)
+            potential = me.pitch_pool + sum(hand[k].pitch or 0 for k in hand if k not in played_set)
             if potential >= sum(costs.values()) + cost + LOOK_TUFF_EXTRA_COST:
                 pay_extra_for.add(key)
                 cost += LOOK_TUFF_EXTRA_COST
         costs[key] = cost
 
-    # A arma é avaliada DEPOIS da fase 2: cartas cortadas por falta de recurso
-    # liberam AP que a arma pode usar.
-
-    # ---- Fase 2: viabilidade de recursos ----------------------------------
+    # ---- Fase 2: viabilidade de recursos -----------------------------------
     def available_now() -> int:
-        return me.pitch_pool + sum(hand[k].pitch or 0 for k in hand if k not in played)
+        return me.pitch_pool + sum(hand[k].pitch or 0 for k in hand if k not in played_set)
 
     while sum(costs.values()) > available_now():
-        # Tenta primeiro downgrade do Look Tuff (joga sem o {r} extra).
         downgraded = False
         for k in list(pay_extra_for):
             if k in sequence and k in hand and hand[k].name == LOOK_TUFF:
                 costs[k] -= LOOK_TUFF_EXTRA_COST
                 pay_extra_for.discard(k)
                 plan.notes.append(
-                    f"{hand[k].name}: sem {LOOK_TUFF_EXTRA_COST}{{r}} extra -> {_power(hand[k], False)}{{p}}."
+                    f"{hand[k].name}: sem {LOOK_TUFF_EXTRA_COST}{{r}} extra -> "
+                    f"{_power(hand[k], False)}{{p}}."
                 )
                 downgraded = True
                 break
@@ -205,12 +182,12 @@ def plan_attack(
             break
         victim = min(victims, key=lambda k: hand[k].power or 0)
         sequence.remove(victim)
-        played.discard(victim)
+        played_set.discard(victim)
         del costs[victim]
         pay_extra_for.discard(victim)
         plan.notes.append(f"{hand[victim].name}: cortado do plano para virar pitch.")
 
-    # ---- Arma: avaliada com o AP e recursos FINAIS da sequência -------------
+    # ---- Arma: avaliada com AP e recursos FINAIS da sequência ---------------
     weapon_in_plan = False
     if weapon_key is None:
         plan.notes.append("Sem arma informada: plano considera só cartas.")
@@ -225,7 +202,7 @@ def plan_attack(
         weapon_in_plan = True
         costs[weapon_key] = 1
 
-    # ---- Fase 3: avaliação determinística ---------------------------------
+    # ---- Fase 3: avaliação determinística -----------------------------------
     phys = 0
     arc = 0
     ap = me.action_points
@@ -240,7 +217,7 @@ def plan_attack(
             phys += power
             ap -= 1
             if lightning_played:
-                ap += 1  # Go Again condicional do Star Fall
+                ap += 1
                 plan.notes.append(f"{cards[weapon_key].name}: +1{{p}} e Go Again por Lightning.")
             continue
         card = hand[key]
@@ -265,7 +242,8 @@ def plan_attack(
             phys += _power(card, key in pay_extra_for)
             if card.name == LOOK_TUFF and key not in pay_extra_for:
                 plan.notes.append(
-                    f"{card.name}: sem {LOOK_TUFF_EXTRA_COST}{{r}} extra -> {_power(card, False)}{{p}}."
+                    f"{card.name}: sem {LOOK_TUFF_EXTRA_COST}{{r}} extra -> "
+                    f"{_power(card, False)}{{p}}."
                 )
             arc += _ping(card, fused_ok)
             if card.name == SHOCKWAVE and not fused_ok:
@@ -277,7 +255,7 @@ def plan_attack(
 
     # Pitch necessário além do pool atual: menor pitch primeiro (preserva azuis).
     pending = max(0, sum(costs.values()) - me.pitch_pool)
-    for k in sorted((k for k in hand if k not in played), key=lambda k: hand[k].pitch or 0):
+    for k in sorted((k for k in hand if k not in played_set), key=lambda k: hand[k].pitch or 0):
         if pending <= 0:
             break
         if (hand[k].pitch or 0) > 0:
@@ -293,7 +271,7 @@ def plan_attack(
 
     # Arsenal: se sobrou AP e há cartas na mão que não foram jogadas,
     # sugere arsenalar a de maior valor defensivo+recurso para o próximo turno.
-    unplayed = [k for k in hand if k not in played and k not in plan.pitched]
+    unplayed = [k for k in hand if k not in played_set and k not in plan.pitched]
     if ap >= 1 and me.arsenal is None and unplayed:
         best = max(unplayed, key=lambda k: _arsenal_score(hand[k]))
         plan.arsenal_suggestion = best
@@ -303,3 +281,53 @@ def plan_attack(
         )
 
     return plan
+
+
+def plan_attack(
+    state: GameState,
+    side: str,
+    cards: dict[str, Card],
+    *,
+    opponent_life: int | None = None,
+    weapon_key: str | None = None,
+) -> AttackPlan:
+    """Monta a linha de jogo que maximiza dano físico+arcano do turno.
+
+    Considera mão + arsenal, recursos (pitch_pool + pitches possíveis),
+    action points, Go Again inato, Embodiment of Lightning e a arma
+    once-per-turn (`weapon_key` vem da decklist do jogador).
+
+    Multi-plan: gera variantes com cada ataque como primeiro (excluindo
+    buffs) e escolhe a de maior dano total.
+    """
+    me = state.players[side]
+    other_side = next(s for s in state.players if s != side)
+    life = opponent_life if opponent_life is not None else state.players[other_side].life
+
+    hand: dict[str, Card] = {}
+    for key in [*me.hand, *([me.arsenal] if me.arsenal else [])]:
+        if key not in cards:
+            raise ValueError(f"carta ausente do registro: {key}")
+        hand[key] = cards[key]
+
+    attacks = [k for k, c in hand.items() if c.is_attack]
+    buffs = [k for k, c in hand.items() if _is_buff(c)]
+
+    # Gera candidatos: cada ataque não-buff como primeiro, mantendo
+    # a ordem original dos demais.
+    candidates: list[list[str]] = []
+    for i, first in enumerate(attacks):
+        order = buffs + [first] + [a for j, a in enumerate(attacks) if j != i]
+        candidates.append(order)
+
+    # Fallback: sem ataques — usa só buffs + arma.
+    if not candidates:
+        candidates.append(buffs)
+
+    best: AttackPlan | None = None
+    for order in candidates:
+        candidate = _build_plan_from_order(me, hand, cards, weapon_key, life, order, ASSUMPTIONS)
+        if best is None or candidate.total > best.total:
+            best = candidate
+
+    return best
