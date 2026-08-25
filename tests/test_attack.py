@@ -193,3 +193,55 @@ def test_pitch_cycling_preserva_azul(state):
     assert len(plan.pitched) >= 1
     first = cards[plan.pitched[0]]
     assert first.pitch == 1
+
+
+def test_arsenal_sugerido_quando_ap_sobra(state):
+    """Quando sobra AP e há cartas na mão, sugere arsenal para o próximo turno."""
+    cards = load_cards()
+    a = state.players["A"]
+    # Snatch (attack, Go Again) + Sigil (DR, def 3). AP=2.
+    # Snatch consome 1 AP (GA devolve). Sobrou 1 AP. Sigil fica na mão.
+    a.hand = ["Snatch (red)", "Sigil of Suffering (red)"]
+    a.action_points = 2
+    a.pitch_pool = 0
+    plan = plan_attack(state, "A", cards)
+    assert plan.arsenal_suggestion == "Sigil of Suffering (red)"
+
+
+def test_arsenal_escolhe_maior_defesa(state):
+    """Dentre cartas disponíveis, escolhe a de maior defesa+pitch para arsenal."""
+    cards = load_cards()
+    a = state.players["A"]
+    # Snatch (attack, Go Again) + Sigil (DR, def 3, pitch 1) +
+    # Unmovable (DR, def 5, pitch 3). AP=2.
+    # Unmovable tem maior defesa+pitch → arsenal preferido.
+    a.hand = ["Snatch (red)", "Sigil of Suffering (red)", "Unmovable (blue)"]
+    a.action_points = 2
+    a.pitch_pool = 0
+    plan = plan_attack(state, "A", cards)
+    assert plan.arsenal_suggestion == "Unmovable (blue)"
+
+
+def test_sem_arsenal_quando_ap_acaba(state):
+    """Sem AP restante, não sugere arsenal."""
+    cards = load_cards()
+    a = state.players["A"]
+    # Snatch (attack, sem GA) + Sigil (DR). AP=1.
+    # Snatch consome o único AP. Sem AP sobrando → sem arsenal.
+    a.hand = ["Snatch (red)", "Sigil of Suffering (red)"]
+    a.action_points = 1
+    a.pitch_pool = 0
+    plan = plan_attack(state, "A", cards)
+    assert plan.arsenal_suggestion is None
+
+
+def test_sem_arsenal_quando_ja_ocupado(state):
+    """Arsenal já ocupado → não sugere novo."""
+    cards = load_cards()
+    a = state.players["A"]
+    a.hand = ["Snatch (red)", "Sigil of Suffering (red)"]
+    a.action_points = 2
+    a.pitch_pool = 0
+    a.arsenal = "Sigil of Suffering (red)"
+    plan = plan_attack(state, "A", cards)
+    assert plan.arsenal_suggestion is None

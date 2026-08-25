@@ -874,6 +874,8 @@ class FaBApp(App[None]):
         self._log_notice(f"  Letal: {'[red]SIM[/]' if plan.lethal else '[green]não[/]'}")
         if plan.pitched:
             self._log_notice(f"  Pitch: {', '.join(plan.pitched)}")
+        if plan.arsenal_suggestion:
+            self._log_notice(f"  Arsenal: [bold]{plan.arsenal_suggestion}[/]")
         for n in plan.notes:
             self._log_notice(f"  [dim]• {n}[/]")
 

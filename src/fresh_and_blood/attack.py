@@ -53,6 +53,7 @@ class AttackPlan:
     resources_left: int = 0
     action_points_left: int = 0
     lethal: bool = False
+    arsenal_suggestion: str | None = None
     notes: list[str] = field(default_factory=list)
 
     @property
@@ -76,6 +77,14 @@ def _ping(card: Card, fused_ok: bool) -> int:
     if card.name == SHOCKWAVE and not fused_ok:
         return 0
     return ping
+
+
+def _arsenal_score(card: Card) -> float:
+    """Pontuação de uma carta para arsenal: defesa + pitch valorizam o próximo turno."""
+    defense = card.defense or 0
+    pitch = card.pitch or 0
+    power = card.power or 0
+    return defense + pitch + power * 0.5
 
 
 def _ap_left(player, hand: dict[str, Card], sequence: list[str]) -> int:
@@ -281,4 +290,16 @@ def plan_attack(
     plan.resources_left = max(0, me.pitch_pool - sum(costs.values()))
     plan.action_points_left = ap
     plan.lethal = plan.total >= life
+
+    # Arsenal: se sobrou AP e há cartas na mão que não foram jogadas,
+    # sugere arsenalar a de maior valor defensivo+recurso para o próximo turno.
+    unplayed = [k for k in hand if k not in played and k not in plan.pitched]
+    if ap >= 1 and me.arsenal is None and unplayed:
+        best = max(unplayed, key=lambda k: _arsenal_score(hand[k]))
+        plan.arsenal_suggestion = best
+        plan.notes.append(
+            f"Arsenal sugerido: {hand[best].name} "
+            f"(def {hand[best].defense or 0}, pitch {hand[best].pitch or 0})."
+        )
+
     return plan
