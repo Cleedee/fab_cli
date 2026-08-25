@@ -175,3 +175,21 @@ def test_arma_reavaliada_apos_corte_por_recurso(state):
     assert plan.pitched == ["Look Tuff (red)"]
     assert plan.physical == 1  # Star Fall (sem Lightning)
     assert not any("sem AP" in n for n in plan.notes)
+
+
+def test_pitch_cycling_preserva_azul(state):
+    """Picha carta vermelha (pitch 1) antes da azul (pitch 3) para preservar recurso."""
+    cards = load_cards()
+    a = state.players["A"]
+    # Chimera (red, cost 2, pitch 1) + Look Tuff (red, cost 3, pitch 7) +
+    # Fluid Motion (blue, cost 0, pitch 3). Pool = 0.
+    # Chimera entra no plano (custo 2). Look Tuff cortado → vira pitch.
+    # Fix: vermelha (1) é pichada antes da azul (3).
+    a.hand = ["Enigma Chimera (red)", "Look Tuff (red)", "Fluid Motion (blue)"]
+    a.action_points = 2
+    a.pitch_pool = 0
+    plan = plan_attack(state, "A", cards)
+    # A carta de menor pitch (vermelha, 1) deve aparecer primeiro na lista
+    assert len(plan.pitched) >= 1
+    first = cards[plan.pitched[0]]
+    assert first.pitch == 1

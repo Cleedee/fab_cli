@@ -266,9 +266,9 @@ def plan_attack(
         if "Lightning" in card.types:
             lightning_played = True
 
-    # Pitch necessário além do pool atual: maiores pitches primeiro.
+    # Pitch necessário além do pool atual: menor pitch primeiro (preserva azuis).
     pending = max(0, sum(costs.values()) - me.pitch_pool)
-    for k in sorted((k for k in hand if k not in played), key=lambda k: -(hand[k].pitch or 0)):
+    for k in sorted((k for k in hand if k not in played), key=lambda k: hand[k].pitch or 0):
         if pending <= 0:
             break
         if (hand[k].pitch or 0) > 0:
