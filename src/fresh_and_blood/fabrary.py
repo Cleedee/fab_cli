@@ -30,16 +30,7 @@ query getDeck($deckId: ID!) {
       card {
         name
         pitch
-        cost
-        power
-        defense
         types
-        keywords
-        functionalTextPlain
-        color
-        rarity
-        silverAgeLegal
-        silverAgeBanned
       }
     }
   }
@@ -67,35 +58,23 @@ def card_key(name: str, pitch: int | None) -> str:
 def extract_card_data(card: dict, pitch: int | None) -> dict:
     """Extrai dados relevantes de uma carta do Fabrary para o registro do projeto.
 
-    Retorna dict compatível com o formato de ``data/cards.yaml``.
+    A API GraphQL do Fabrary só expõe name, pitch e types no tipo Card.
+    Campos ausentes recebem defaults razoáveis; o registro completo vem do
+    dataset the-fab-cube (build_cards.py --all).
     """
-    keywords = [
-        kw.strip()
-        for chunk in (card.get("keywords") or [])
-        if chunk
-        for kw in chunk.split(",")
-        if kw.strip()
-    ]
     return {
         "name": card["name"],
         "color": pitch_to_color(pitch),
         "pitch": pitch,
-        "cost": _num(card.get("cost")),
-        "power": _num(card.get("power")),
-        "defense": _num(card.get("defense")),
+        "cost": None,
+        "power": None,
+        "defense": None,
         "types": card.get("types") or [],
-        "keywords": keywords,
-        "text": card.get("functionalTextPlain") or "",
-        "rarity": card.get("rarity") or "",
-        "sa_legal": bool(card.get("silverAgeLegal")) and not card.get("silverAgeBanned"),
+        "keywords": [],
+        "text": "",
+        "rarity": "",
+        "sa_legal": True,
     }
-
-
-def _num(value: str | None) -> int | None:
-    if value is None:
-        return None
-    v = str(value).strip()
-    return int(v) if v.isdigit() else None
 
 
 # ---------------------------------------------------------------------------

@@ -25,28 +25,22 @@ def test_card_key_without_pitch():
 
 
 def test_extract_card_data_full():
+    """A API GraphQL só expõe name, pitch e types."""
     fab_card = {
         "name": "Snatch",
         "pitch": "1",
-        "cost": "0",
-        "power": "3",
-        "defense": "3",
         "types": ["Action"],
-        "keywords": ["Go again"],
-        "functionalTextPlain": "When this hits, gain 1 action point.",
-        "rarity": "C",
-        "silverAgeLegal": True,
-        "silverAgeBanned": False,
     }
     result = extract_card_data(fab_card, 1)
     assert result["name"] == "Snatch"
     assert result["color"] == "red"
     assert result["pitch"] == 1
-    assert result["cost"] == 0
-    assert result["power"] == 3
-    assert result["defense"] == 3
     assert result["types"] == ["Action"]
-    assert result["keywords"] == ["Go again"]
+    # Campos indisponíveis na API recebem defaults
+    assert result["cost"] is None
+    assert result["power"] is None
+    assert result["defense"] is None
+    assert result["keywords"] == []
     assert result["sa_legal"] is True
 
 
@@ -62,14 +56,11 @@ def test_extract_card_data_missing_fields():
     assert result["types"] == []
     assert result["keywords"] == []
     assert result["text"] == ""
-    assert result["sa_legal"] is False
+    assert result["sa_legal"] is True  # API não expõe banned; assume legal
 
 
 def test_extract_card_data_banned():
-    fab_card = {
-        "name": "Banned Card",
-        "silverAgeLegal": True,
-        "silverAgeBanned": True,
-    }
+    """A API GraphQL não expõe silverAgeBanned; sa_legal é sempre True."""
+    fab_card = {"name": "Banned Card"}
     result = extract_card_data(fab_card, 1)
-    assert result["sa_legal"] is False
+    assert result["sa_legal"] is True
