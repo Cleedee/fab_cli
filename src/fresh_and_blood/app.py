@@ -152,6 +152,86 @@ def _card_details(key: str, card: Card) -> list[str]:
     return lines
 
 
+# ── Board browser ────────────────────────────────────────────────────
+
+
+@dataclass
+class _BrowseCard:
+    """Uma carta navegável no índice do board."""
+
+    idx: int  # 1-based
+    key: str
+    side: str  # "A" ou "B"
+    location: str  # "weapon", "equipment", "hand", "arsenal", "aura"
+    label: str  # ex: "Wpn", "Head", "hand A", "Arsenal", "Aura"
+
+
+@dataclass
+class _BrowseIndex:
+    """Índice de cartas para navegação board/read."""
+
+    cards: list[_BrowseCard]
+    current: int = 0  # índice no cards (0-based)
+
+    @property
+    def total(self) -> int:
+        return len(self.cards)
+
+    def get(self) -> _BrowseCard | None:
+        if 0 <= self.current < len(self.cards):
+            return self.cards[self.current]
+        return None
+
+    def next(self) -> _BrowseCard | None:
+        if self.current < len(self.cards) - 1:
+            self.current += 1
+        return self.get()
+
+    def prev(self) -> _BrowseCard | None:
+        if self.current > 0:
+            self.current -= 1
+        return self.get()
+
+
+def _collect_board_cards(state: GameState, cards: dict[str, Card]) -> list[_BrowseCard]:
+    """Coleta todas as cartas visíveis na mesa e mãos com índices."""
+    result: list[_BrowseCard] = []
+    idx = 0
+
+    for side in ("A", "B"):
+        p = state.players[side]
+
+        for key in p.weapons:
+            idx += 1
+            c = cards.get(key)
+            slot = "2H" if c and "2H" in c.types else "1H"
+            result.append(_BrowseCard(idx, key, side, "weapon", f"Wpn({slot})"))
+
+        for key in p.equipment_uses:
+            if key in p.equipment_destroyed:
+                continue
+            idx += 1
+            c = cards.get(key)
+            slot = c.equipment_slot if c else "?"
+            result.append(_BrowseCard(idx, key, side, "equipment", slot or "Equip"))
+
+        for key in p.hand:
+            idx += 1
+            result.append(_BrowseCard(idx, key, side, "hand", f"Mão {side}"))
+
+        if p.arsenal:
+            idx += 1
+            result.append(_BrowseCard(idx, p.arsenal, side, "arsenal", f"Arsenal {side}"))
+
+        for key, counters in p.auras.items():
+            for i, cnt in enumerate(counters):
+                idx += 1
+                label = f"Aura {side}" + (f" [{cnt}]" if cnt else "")
+                result.append(_BrowseCard(idx, key, side, "aura", label))
+
+    return result
+
+
 # ── Widgets ────────────────────────────────────────────────────────────
 
 
@@ -334,9 +414,13 @@ class FaBApp(App[None]):
     _READONLY_COMMANDS: ClassVar[frozenset[str]] = frozenset(
         {
             "",
+            "board",
             "card",
             "help",
             "plan",
+            "read",
+            "rn",
+            "rp",
             "suggest",
             "prob",
             "status",
@@ -374,6 +458,7 @@ class FaBApp(App[None]):
         self._undo_stack = []
         self._replay_index: int = 0
         self._replay_mode: bool = False
+        self._browse_index: _BrowseIndex | None = None
         self.session_log = rec.SessionLog(
             hero_a=matchup.hero_a.name,
             hero_b=matchup.hero_b.name,
@@ -547,6 +632,7 @@ class FaBApp(App[None]):
 
         dispatch = {
             "help": self._cmd_help,
+            "board": self._cmd_board,
             "card": self._cmd_card,
             "draw": self._cmd_draw,
             "pitch": self._cmd_pitch,
@@ -561,6 +647,9 @@ class FaBApp(App[None]):
             "resolve": self._cmd_resolve,
             "next": self._cmd_next,
             "switch": self._cmd_switch,
+            "read": self._cmd_read,
+            "rn": lambda a: self._cmd_read(["next"]),
+            "rp": lambda a: self._cmd_read(["prev"]),
             "plan": self._cmd_plan,
             "suggest": self._cmd_suggest,
             "prob": self._cmd_prob,
@@ -591,6 +680,8 @@ class FaBApp(App[None]):
     def _cmd_help(self, args: list[str]) -> None:
         """Mostra lista de comandos."""
         self._log_notice("[bold underline]Comandos disponíveis:[/]")
+        self._log_notice("  [bold]board[/] [hand|field|a|b]  — lista cartas na mesa/mãos")
+        self._log_notice("  [bold]read[/] [N|nome|next|prev] — detalhes da carta (rn/rp)")
         self._log_notice("  [bold]card[/] <carta>            — mostra detalhes da carta")
         self._log_notice("  [bold]draw[/] <carta>           — adiciona carta à mão do ativo")
         self._log_notice("  [bold]pitch[/] <carta>          — dá pitch de uma carta da mão")
@@ -625,6 +716,138 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]undo[/]                    — desfaz a última ação")
         self._log_notice("  [bold]reset[/]                   — reinicia a partida do zero")
         self._log_notice("  [bold]help[/]                    — esta mensagem")
+
+    def _cmd_board(self, args: list[str]) -> None:
+        """board [filtro] — lista todas as cartas na mesa e mãos com índices.
+
+        Filtros: hand, field, a, b (combináveis).
+        Exemplos: board, board hand, board a, board field b
+        """
+        all_cards = _collect_board_cards(self.game_state, self.cards)
+        if not all_cards:
+            self._log_notice("Nenhuma carta na mesa ou nas mãos.")
+            return
+
+        # Parse filtros
+        filtros = {a.lower() for a in args}
+        hand_only = "hand" in filtros
+        field_only = "field" in filtros
+        side_filter: str | None = None
+        if "a" in filtros:
+            side_filter = "A"
+        elif "b" in filtros:
+            side_filter = "B"
+
+        filtered = all_cards
+        if hand_only:
+            filtered = [c for c in filtered if c.location == "hand"]
+        elif field_only:
+            filtered = [c for c in filtered if c.location != "hand"]
+        if side_filter:
+            filtered = [c for c in filtered if c.side == side_filter]
+
+        if not filtered:
+            self._log_notice("Nenhuma carta corresponde ao filtro.")
+            return
+
+        # Agrupar por seção
+        sections: dict[str, list[_BrowseCard]] = {}
+        for bc in filtered:
+            if bc.location in ("weapon", "equipment"):
+                sec = f"Mesa ({bc.side})"
+            elif bc.location == "aura":
+                sec = f"Auras ({bc.side})"
+            elif bc.location == "hand":
+                sec = f"Mão ({bc.side})"
+            elif bc.location == "arsenal":
+                sec = f"Arsenal ({bc.side})"
+            else:
+                sec = bc.location
+            sections.setdefault(sec, []).append(bc)
+
+        self._log_notice("[bold]Board:[/]")
+        for sec_name, sec_cards in sections.items():
+            self._log_notice(f"  [dim]{sec_name}:[/]")
+            for bc in sec_cards:
+                card = self.cards.get(bc.key)
+                if card is None:
+                    self._log_notice(f"    [{bc.idx}] [red]{bc.key}[/] [dim](?)[/]")
+                    continue
+                parts: list[str] = [f"[bold]{bc.key}[/]"]
+                if card.power is not None:
+                    parts.append(f"{card.power}{{p}}")
+                if card.defense is not None:
+                    parts.append(f"{card.defense}{{d}}")
+                if card.cost:
+                    parts.append(f"{card.cost}{{r}}")
+                if card.keywords:
+                    parts.append(", ".join(card.keywords))
+                self._log_notice(f"    [{bc.idx}] {' — '.join(parts)}")
+
+        # Salvar índice para navegação
+        self._browse_index = _BrowseIndex(filtered)
+
+    def _cmd_read(self, args: list[str]) -> None:
+        """read [N|nome|next|prev] — mostra detalhes de uma carta.
+
+        read 4       — carta #4 do último board
+        read snatch  — busca por nome
+        read next    — próxima carta (rn)
+        read prev    — carta anterior (rp)
+        read         — repete último read
+        """
+        if not self._browse_index and not args:
+            raise ValueError("Navegue com 'board' primeiro, ou use 'read <N>'")
+        if not self._browse_index:
+            raise ValueError("Navegue com 'board' primeiro.")
+
+        texto = " ".join(args).lower() if args else ""
+
+        if texto in ("next", "n", "proxima", "próxima"):
+            bc = self._browse_index.next()
+            if bc is None:
+                self._log_notice("Já está na última carta.")
+                return
+        elif texto in ("prev", "p", "anterior"):
+            bc = self._browse_index.prev()
+            if bc is None:
+                self._log_notice("Já está na primeira carta.")
+                return
+        elif texto.isdigit():
+            num = int(texto)
+            for card in self._browse_index.cards:
+                if card.idx == num:
+                    self._browse_index.current = self._browse_index.cards.index(card)
+                    bc = card
+                    break
+            else:
+                raise ValueError(f"Índice {num} não encontrado no board.")
+        elif texto:
+            # Busca por nome
+            found = None
+            for card in self._browse_index.cards:
+                if texto in card.key.lower():
+                    found = card
+                    break
+            if found is None:
+                raise ValueError(f"Carta '{texto}' não encontrada no board.")
+            self._browse_index.current = self._browse_index.cards.index(found)
+            bc = found
+        else:
+            # Repete último
+            bc = self._browse_index.get()
+            if bc is None:
+                raise ValueError("Nenhuma carta selecionada.")
+
+        card = self.cards.get(bc.key)
+        if card is None:
+            self._log_notice(f"[red]Carta fora do registro: {bc.key}[/]")
+            return
+
+        pos = f"{self._browse_index.current + 1}/{self._browse_index.total}"
+        self._log_notice(f"[dim]({pos})[/]")
+        for line in _card_details(bc.key, card):
+            self._log_notice(line)
 
     def _cmd_card(self, args: list[str]) -> None:
         """card <carta|número> — mostra todos os detalhes de uma carta.
