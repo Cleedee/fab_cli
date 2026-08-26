@@ -84,10 +84,9 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         errors = validate(deck, cards)
         if errors:
-            print(f"decklist inválida ({path}):", file=sys.stderr)
+            print(f"aviso ({path}):", file=sys.stderr)
             for e in errors:
                 print(f"  - {e}", file=sys.stderr)
-            return 1
         decks.append(deck)
 
     # Deriva heróis e armas das decklists
