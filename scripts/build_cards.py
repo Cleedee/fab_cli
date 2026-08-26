@@ -2,17 +2,24 @@
 """Gera data/cards.yaml a partir do dataset the-fab-cube/flesh-and-blood-cards.
 
 Uso:
-    python scripts/build_cards.py \
-        --dataset-dir /caminho/fab-json/json/english \
-        --decks-dir data/decks \
-        --out data/cards.yaml
+    # Gerar registro com TODAS as cartas FaB (recomendado):
+    python scripts/build_cards.py --all
+
+    # Gerar registro com cartas dos decks em --decks-dir (comportamento original):
+    python scripts/build_cards.py --dataset-dir /caminho/fab-json/json/english
+
+    # Combinar: --all + --decks-dir para incluir tokens extras:
+    python scripts/build_cards.py --all --decks-dir data/decks
 
 O dataset pode ser baixado de:
     https://github.com/the-fab-cube/flesh-and-blood-cards/releases
 (arquivo json.zip da release mais recente)
 
-O registro gerado contém somente as cartas usadas nos decks em --decks-dir,
-mais os tokens relevantes. Campos numéricos vazios viram null.
+Ou baixado automaticamente com --all (sem --dataset-dir).
+
+O registro gerado contém todas as cartas do dataset (--all) ou somente as
+cartas usadas nos decks em --decks-dir (comportamento original).
+Campos numéricos vazios viram None.
 """
 
 from __future__ import annotations
@@ -21,6 +28,7 @@ import argparse
 import json
 import re
 import sys
+import urllib.request
 from pathlib import Path
 
 import yaml
@@ -30,6 +38,11 @@ COLOR_SUFFIX = re.compile(r"\s*\((red|yellow|blue)\)$", re.IGNORECASE)
 COLORS = {"Red": "red", "Yellow": "yellow", "Blue": "blue"}
 
 RARITY_RANK = {"T": 0, "C": 1, "R": 2, "M": 3, "L": 4, "S": 5, "F": 6, "V": 7}
+
+GITHUB_CARD_JSON_URL = (
+    "https://raw.githubusercontent.com/the-fab-cube/flesh-and-blood-cards/"
+    "develop/json/english/card.json"
+)
 
 # Correções manuais para limitações conhecidas do dataset.
 # Briar jovem é dupla-face com a adulta (ELE062//ELE063): o dataset funde as duas
@@ -109,6 +122,7 @@ def to_entry(card: dict) -> dict:
         for kw in chunk.split(",")
         if kw.strip()
     ]
+    types = card.get("types") or ["Token"]
     return {
         "name": card["name"],
         "color": COLORS.get(card.get("color", "")),
@@ -116,7 +130,7 @@ def to_entry(card: dict) -> dict:
         "cost": num(card.get("cost", "")),
         "power": num(card.get("power", "")),
         "defense": num(card.get("defense", "")),
-        "types": card.get("types", []),
+        "types": types,
         "keywords": keywords,
         "text": card.get("functional_text_plain", ""),
         "rarity": best_rarity(card),
@@ -124,16 +138,21 @@ def to_entry(card: dict) -> dict:
     }
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset-dir", required=True, type=Path)
-    parser.add_argument("--decks-dir", type=Path, default=Path("data/decks"))
-    parser.add_argument("--out", type=Path, default=Path("data/cards.yaml"))
-    args = parser.parse_args()
+def download_card_json() -> list[dict]:
+    """Baixa card.json do repositório the-fab-cube/flesh-and-blood-cards."""
+    print(f"Baixando {GITHUB_CARD_JSON_URL}...", file=sys.stderr)
+    req = urllib.request.Request(
+        GITHUB_CARD_JSON_URL,
+        headers={"User-Agent": "fab-cli/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    print(f"{len(data)} cartas baixadas.", file=sys.stderr)
+    return data
 
-    with open(args.dataset_dir / "card.json", encoding="utf-8") as f:
-        all_cards = json.load(f)
 
+def build_all_cards(all_cards: list[dict]) -> dict[str, dict]:
+    """Converte todas as cartas do dataset para o formato do registro."""
     index_by_name_color: dict[tuple[str, str | None], dict] = {}
     index_by_name: dict[str, list[dict]] = {}
     for card in all_cards:
@@ -141,40 +160,111 @@ def main() -> int:
         index_by_name_color[(norm(card["name"]), color)] = card
         index_by_name.setdefault(norm(card["name"]), []).append(card)
 
-    colored_keys, plain_names = collect_required_keys(args.decks_dir)
-
     out: dict[str, dict] = {}
-    missing: list[str] = []
 
-    for key in sorted(colored_keys):
-        base, color = parse_key(key)
-        card = index_by_name_color.get((norm(base), color))
-        if card is None:
-            missing.append(key)
-        else:
-            out[key] = apply_overrides(key, to_entry(card))
+    # Cartas com cor: todas
+    for (name, color), card in index_by_name_color.items():
+        if color is not None:
+            key = f"{card['name']} ({color})"
+            out[key] = apply_overrides(card["name"], to_entry(card))
 
-    for name in sorted(plain_names):
-        candidates = index_by_name.get(norm(name), [])
-        if not candidates:
-            missing.append(name)
+    # Cartas sem cor: equipamentos, armas, heróis, tokens
+    for candidates in index_by_name.values():
+        # Pula cartas que já foram adicionadas com cor
+        if any(COLORS.get(c.get("color", "")) for c in candidates):
             continue
-        # sem cor: se houver várias impressões coloridas, usa a primeira (tokens/herois não têm)
         card = candidates[0]
-        entry = apply_overrides(name, to_entry(card))
-        if entry["color"] is not None and len(candidates) > 1:
-            print(
-                f"Aviso: '{name}' tem versões coloridas; usando a primeira "
-                f"({entry['color']}). Prefira chaves com sufixo de cor.",
-                file=sys.stderr,
-            )
-        out[name] = entry
+        entry = apply_overrides(card["name"], to_entry(card))
+        out[card["name"]] = entry
 
-    if missing:
-        print("Cartas não encontradas no dataset:", file=sys.stderr)
-        for name in missing:
-            print(f"  - {name}", file=sys.stderr)
-        return 1
+    return out
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Gera registro com TODAS as cartas FaB (requer --dataset-dir ou download automático)",
+    )
+    parser.add_argument("--dataset-dir", type=Path, default=None)
+    parser.add_argument("--decks-dir", type=Path, default=Path("data/decks"))
+    parser.add_argument("--out", type=Path, default=Path("data/cards.yaml"))
+    args = parser.parse_args()
+
+    if not args.all and args.dataset_dir is None:
+        parser.error("Especifique --all ou --dataset-dir")
+
+    if args.dataset_dir is not None:
+        with open(args.dataset_dir / "card.json", encoding="utf-8") as f:
+            all_cards = json.load(f)
+    elif args.all:
+        all_cards = download_card_json()
+    else:
+        all_cards = []
+
+    if args.all:
+        # Modo --all: incluir todas as cartas do dataset
+        out = build_all_cards(all_cards)
+        # Adicionar tokens mesmo que não estejam no dataset
+        for token_name in TOKENS:
+            if token_name not in out:
+                # Tokens não estão no dataset principal; adicionar entrada básica
+                out[token_name] = {
+                    "name": token_name,
+                    "color": None,
+                    "pitch": None,
+                    "cost": None,
+                    "power": None,
+                    "defense": None,
+                    "types": ["Token"],
+                    "keywords": [],
+                    "text": "",
+                    "rarity": "",
+                    "sa_legal": False,
+                }
+    else:
+        # Modo original: somente cartas dos decks
+        index_by_name_color: dict[tuple[str, str | None], dict] = {}
+        index_by_name: dict[str, list[dict]] = {}
+        for card in all_cards:
+            color = COLORS.get(card.get("color", ""))
+            index_by_name_color[(norm(card["name"]), color)] = card
+            index_by_name.setdefault(norm(card["name"]), []).append(card)
+
+        colored_keys, plain_names = collect_required_keys(args.decks_dir)
+
+        out: dict[str, dict] = {}
+        missing: list[str] = []
+
+        for key in sorted(colored_keys):
+            base, color = parse_key(key)
+            card = index_by_name_color.get((norm(base), color))
+            if card is None:
+                missing.append(key)
+            else:
+                out[key] = apply_overrides(key, to_entry(card))
+
+        for name in sorted(plain_names):
+            candidates = index_by_name.get(norm(name), [])
+            if not candidates:
+                missing.append(name)
+                continue
+            card = candidates[0]
+            entry = apply_overrides(name, to_entry(card))
+            if entry["color"] is not None and len(candidates) > 1:
+                print(
+                    f"Aviso: '{name}' tem versões coloridas; usando a primeira "
+                    f"({entry['color']}). Prefira chaves com sufixo de cor.",
+                    file=sys.stderr,
+                )
+            out[name] = entry
+
+        if missing:
+            print("Cartas não encontradas no dataset:", file=sys.stderr)
+            for name in missing:
+                print(f"  - {name}", file=sys.stderr)
+            return 1
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     header = (

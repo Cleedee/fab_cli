@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -13,6 +14,16 @@ CARDS_FILE = DATA_DIR / "cards.yaml"
 
 
 def load_cards(path: Path = CARDS_FILE) -> dict[str, Card]:
+    """Carrega registro de cartas com cache por arquivo.
+
+    Evita reler o YAML a cada chamada (importante com 4950+ cartas).
+    """
+    return _load_cached(str(path))
+
+
+@lru_cache(maxsize=4)
+def _load_cached(path_str: str) -> dict[str, Card]:
+    path = Path(path_str)
     with open(path, encoding="utf-8") as f:
         raw: dict[str, dict] = yaml.safe_load(f)
     return {key: _parse(key, entry) for key, entry in raw.items()}

@@ -4,10 +4,8 @@ import yaml
 from scripts.fetch_decklist import (
     _decode_html_entities,
     _extract_fabrary_deck_id,
-    _fabrary_card_key,
     _is_fabrary_url,
     _normalize_color,
-    _pitch_to_color,
     _split_cards_by_section,
     convert_fabrary_to_yaml,
     convert_html_to_yaml,
@@ -15,6 +13,8 @@ from scripts.fetch_decklist import (
 )
 
 from fresh_and_blood.deck import load_decklist
+from fresh_and_blood.fabrary import card_key as _fabrary_card_key
+from fresh_and_blood.fabrary import pitch_to_color as _pitch_to_color
 
 SAMPLE_HTML = """
 <html><body>
