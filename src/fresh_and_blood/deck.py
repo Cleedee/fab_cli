@@ -26,6 +26,28 @@ HERO_ALLOWED_TYPES: dict[str, frozenset[str]] = {
         {"Generic", "Elemental", "Runeblade", "Earth", "Lightning", "Hero"}
     ),
     "Enigma": frozenset({"Generic", "Illusionist", "Mystic", "Hero"}),
+    # Elemental: essências nos keywords/texto não entram nos types do dataset.
+    "Oscilio": frozenset(
+        {"Generic", "Elemental", "Wizard", "Lightning", "Hero"}
+    ),
+    "Aurora": frozenset(
+        {"Generic", "Elemental", "Runeblade", "Lightning", "Hero"}
+    ),
+    "Florian": frozenset(
+        {"Generic", "Elemental", "Runeblade", "Earth", "Hero"}
+    ),
+    "Lexi": frozenset(
+        {"Generic", "Elemental", "Ranger", "Ice", "Lightning", "Hero"}
+    ),
+    "Oldhim": frozenset(
+        {"Generic", "Elemental", "Guardian", "Earth", "Ice", "Hero"}
+    ),
+    "Terra": frozenset(
+        {"Generic", "Elemental", "Guardian", "Earth", "Hero"}
+    ),
+    "Verdance": frozenset(
+        {"Generic", "Elemental", "Wizard", "Earth", "Hero"}
+    ),
 }
 
 # Tipos do card de herói que NÃO são classes/talents jogáveis por cartas de deck.
