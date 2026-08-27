@@ -7,3 +7,10 @@ __pycache__/
 dist/
 data/logs/
 .playwright-mcp/
+
+# Dados gerados/local — fora do repositório por questões de licença:
+# - data/cards.yaml: derivado do dataset the-fab-cube/flesh-and-blood-cards (sem licença formal)
+# - data/decks/*.yaml: decklists baixadas de fabtcg.com (ToS proíbe redistribuição)
+# Gere localmente com scripts/build_cards.py e scripts/fetch_decklist.py.
+data/cards.yaml
+data/decks/

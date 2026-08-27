@@ -527,6 +527,12 @@ class FaBApp(App[None]):
             f"{self.matchup.label('A')} vs {self.matchup.label('B')} — Turno 1. "
             "Comandos: [bold]help[/] para lista."
         )
+        self._log_notice(
+            "[dim]Não afiliado a Legend Story Studios. "
+            "Flesh and Blood™ e nomes de produtos são marcas registradas da "
+            "Legend Story Studios. Cartas, personagens e artes pertencem à "
+            "Legend Story Studios.[/]"
+        )
         p_a = self.game_state.players["A"]
         if p_a.hand or p_a.equipment_uses:
             self._log_notice(

@@ -7,6 +7,11 @@ Matchup inicial: **Briar, Warden of Thorns** vs. **Enigma** (ambos jovens, 20 vi
 > matemática de combate, sugestões de defesa/ataque, probabilidades e revisão pós-jogo.
 > O usuário controla os **dois lados** da mesa e declara manualmente o estado.
 
+> ⚠️ Projecto não comercial e **não afiliado à Legend Story Studios**.
+> Flesh and Blood™, Legend Story Studios® e nomes de produtos são marcas
+> registradas da Legend Story Studios. Cartas, personagens e artes pertencem
+> à Legend Story Studios.
+
 ## Instalação
 
 ```bash
@@ -19,6 +24,33 @@ python3 -m venv .venv
 Para usar apenas o motor (sem TUI), as dependências mínimas são Python 3.11+ e PyYAML.
 
 A TUI (Textual) é instalada automaticamente com o pacote.
+
+## Dados e licenças
+
+Por razões de licença, os seguintes arquivos **não estão no repositório** e
+devem ser gerados localmente:
+
+| Arquivo | Fonte | Motivo |
+|---|---|---|
+| `data/cards.yaml` | dataset `the-fab-cube/flesh-and-blood-cards` | sem licença formal no dataset |
+| `data/decks/*.yaml` | decklists de `fabtcg.com` | ToS do site proíbe redistribuição sem consentimento |
+
+O código-fonte (em `src/`, `tests/`, `scripts/`) é autoral e fica fora dessa
+restrição. Gere os dados assim:
+
+```bash
+# 1. Registro de cartas (data/cards.yaml)
+#    Baixe o json.zip da release mais recente de
+#    https://github.com/the-fab-cube/flesh-and-blood-cards
+python scripts/build_cards.py --dataset-dir <caminho>/json/english
+
+# 2. Decklists (data/decks/*.yaml) — como descrito abaixo
+python scripts/fetch_decklist.py <url-do-fabtcg>
+```
+
+Sem o `data/cards.yaml` o `fab` não inicia; sem as decklists, use
+`--deck-a`/`--deck-b` apontando para decklists próprias no formato de
+`data/decks/`.
 
 ## Uso
 
@@ -220,11 +252,11 @@ src/fresh_and_blood/
 ├── recorder.py          — log de sessão (Fase 4)
 └── review.py            — métricas e revisão pós-jogo (Fase 4)
 data/
-├── cards.yaml           — registro de cartas (gerado)
+├── cards.yaml           — registro de cartas (gerado localmente, fora do git)
 └── decks/
-    ├── briar_sa.yaml    — deck Briar Silver Age
-    └── enigma_sa.yaml   — deck Enigma Silver Age
-tests/                   — 80 testes (pytest)
+    ├── briar_sa.yaml    — deck Briar Silver Age (gerado, fora do git)
+    └── enigma_sa.yaml   — deck Enigma Silver Age (gerado, fora do git)
+tests/                   — ~200 testes (pytest)
 ```
 
 ## Importar decklists da internet
@@ -250,9 +282,10 @@ Depois de importar, use com a CLI:
 fab --deck-a data/decks/minha_lista.yaml
 ```
 
-> ⚠️ O registro `data/cards.yaml` só contém as cartas do matchup Briar × Enigma.
-> Para jogar uma decklist importada com outras cartas, rode antes
-> `scripts/build_cards.py` com o dataset completo (veja AGENTS.md).
+> ⚠️ O registro `data/cards.yaml` (gerado localmente — veja "Dados e licenças")
+> precisa cobrir as cartas da decklist importada. Para jogar decklists com
+> cartas fora do matchup padrão, rode antes `scripts/build_cards.py` com o
+> dataset completo (veja AGENTS.md).
 
 ## Desenvolvimento
 

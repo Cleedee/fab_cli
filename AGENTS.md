@@ -26,7 +26,20 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 # baixe json.zip da release mais recente de
 # https://github.com/the-fab-cube/flesh-and-blood-cards
 python scripts/build_cards.py --dataset-dir <caminho>/json/english
+
+# ATENÇÃO — dados fora do git (questões de licença):
+# data/cards.yaml (dataset sem licença formal) e data/decks/*.yaml
+# (decklists de fabtcg.com, ToS proíbe redistribuição) são .gitignored.
+# O código-fonte DEVE funcionar com esses arquivos presentes localmente;
+# na ausência deles, a CI/commit verifica com --skip-dados (ver abaixo).
 ```
+
+## Dados e testes
+
+- `data/cards.yaml` e `data/decks/*.yaml` são **excluídos do git** (ver `.gitignore`).
+- Em clone limpo, gere os dados (seção acima) antes de rodar testes —
+  as fixtures carregam `load_cards()` e `data/decks/*_sa.yaml`.
+- Nunca commitar dados gerados por `build_cards.py` ou `fetch_decklist.py`.
 
 ## Arquitetura (`src/fresh_and_blood/`)
 
