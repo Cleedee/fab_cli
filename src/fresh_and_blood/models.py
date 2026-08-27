@@ -104,6 +104,8 @@ class PlayerState:
     # Off-Hand: equipamento que ocupa o segundo slot de arma (ex.: escudo).
     # Só pode haver um; não pode coexistir com arma 2H.
     offhand_key: str | None = None
+    # tokens item: nome -> quantidade (Gold, Silver, Copper, etc.)
+    tokens: dict[str, int] = field(default_factory=dict)
 
     # --- contadores por turno (resetados em start_turn) ---
     hero_ability_used: bool = False
@@ -136,6 +138,22 @@ class PlayerState:
         if not copies:
             del self.auras[card_key]
         return counters
+
+    def add_token(self, name: str, qty: int = 1) -> int:
+        """Cria tokens item; retorna a quantidade total."""
+        self.tokens[name] = self.tokens.get(name, 0) + qty
+        return self.tokens[name]
+
+    def pop_token(self, name: str, qty: int = 1) -> int:
+        """Remove tokens item; retorna a quantidade restante (0 se nenhum)."""
+        current = self.tokens.get(name, 0)
+        remove = min(qty, current)
+        new = current - remove
+        if new > 0:
+            self.tokens[name] = new
+        else:
+            self.tokens.pop(name, None)
+        return new
 
 
 @dataclass

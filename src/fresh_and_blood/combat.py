@@ -51,12 +51,65 @@ def start_turn(state: GameState, side: str) -> list[Notice]:
     while p.auras.get(EMBODIMENT_EARTH):
         p.pop_aura(EMBODIMENT_EARTH)
         notices.append(Notice(f"{EMBODIMENT_EARTH} destruído (início da action phase)."))
+
+    # --- Tokens: triggers de início de turno ---
+    # Might: destrói, próximo ataque +1{p}
+    if has_aura(p, TOKEN_MIGHT):
+        p.pop_aura(TOKEN_MIGHT)
+        notices.append(Notice(f"{TOKEN_MIGHT} destruído: próximo ataque +1{{p}}."))
+
+    # Agility: destrói, próximo ataque Go Again
+    if has_aura(p, TOKEN_AGILITY):
+        p.pop_aura(TOKEN_AGILITY)
+        notices.append(Notice(f"{TOKEN_AGILITY} destruído: próximo ataque Go Again."))
+
+    # Vigor: destrói, +1{r}
+    if has_aura(p, TOKEN_VIGOR):
+        p.pop_aura(TOKEN_VIGOR)
+        p.pitch_pool += 1
+        notices.append(Notice(f"{TOKEN_VIGOR} destruído: +1{{r}}."))
+
+    # Toughness: no início do turno do oponente, destrói e dá +1{d} na próxima defesa
+    opponent = state.players[state.opponent_of(side)]
+    if has_aura(opponent, TOKEN_TOUGHNESS):
+        opponent.pop_aura(TOKEN_TOUGHNESS)
+        notices.append(Notice(f"{TOKEN_TOUGHNESS} (oponente) destruído: próxima defesa +1{{d}}."))
+
     return notices
 
 
-def end_turn(state: GameState) -> None:
-    """Encerra o turno e passa para o oponente (compra é manual por enquanto)."""
+def end_turn(state: GameState) -> list[Notice]:
+    """Encerra o turno e passa para o oponente. Retorna lembretes de triggers."""
+    notices: list[Notice] = []
+    p = state.players[state.active_player]
+
+    # --- Tokens: triggers fim de turno ---
+    # Ponder: destrói, compre 1 carta
+    if has_aura(p, TOKEN_PONDER):
+        p.pop_aura(TOKEN_PONDER)
+        notices.append(Notice(f"{TOKEN_PONDER} destruído: compre 1 carta."))
+
+    # Bloodrot Pox: 2{d} ou pagar {r}{r}{r}
+    if has_aura(p, TOKEN_BLOODROT_POX):
+        notices.append(Notice(f"{TOKEN_BLOODROT_POX}: pague {{r}}{{r}}{{r}} ou receba 2{{d}}."))
+
+    # Inertia: bottom hand+arsenal
+    if has_aura(p, TOKEN_INERTIA):
+        p.pop_aura(TOKEN_INERTIA)
+        notices.append(Notice(f"{TOKEN_INERTIA}: coloque mão+arsenal no fundo do deck."))
+
+    # Frostbite: destrói no fim de turno
+    if has_aura(p, TOKEN_FROSTBITE):
+        p.pop_aura(TOKEN_FROSTBITE)
+        notices.append(Notice(f"{TOKEN_FROSTBITE} destruído (fim de turno)."))
+
+    # Frailty: destrói no fim de turno
+    if has_aura(p, TOKEN_FRAILTY):
+        p.pop_aura(TOKEN_FRAILTY)
+        notices.append(Notice(f"{TOKEN_FRAILTY} destruído (fim de turno)."))
+
     state.active_player = state.opponent_of(state.active_player)
+    return notices
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +134,102 @@ def place_arsenal(state: GameState, side: str, card_key: str) -> None:
         raise CombatError("arsenal já ocupado")
     _move_card(p.hand, card_key)
     p.arsenal = card_key
+
+
+def discard(state: GameState, side: str, card_key: str) -> None:
+    """Descarta uma carta da mão para o cemitério."""
+    p = state.players[side]
+    _move_card(p.hand, card_key)
+    p.graveyard.append(card_key)
+
+
+# ---------------------------------------------------------------------------
+# Tokens
+# ---------------------------------------------------------------------------
+
+# Nomes dos tokens mais comuns (constantes para referência)
+TOKEN_GOLD = "Gold"
+TOKEN_SILVER = "Silver"
+TOKEN_COPPER = "Copper"
+TOKEN_MIGHT = "Might"
+TOKEN_COURAGE = "Courage"
+TOKEN_PONDER = "Ponder"
+TOKEN_VIGOR = "Vigor"
+TOKEN_AGILITY = "Agility"
+TOKEN_QUICKEN = "Quicken"
+TOKEN_ELOQUENCE = "Eloquence"
+TOKEN_RUNECHANT = "Runechant"
+TOKEN_TOUGHNESS = "Toughness"
+TOKEN_FROSTBITE = "Frostbite"
+TOKEN_FRAILTY = "Frailty"
+TOKEN_BLOODROT_POX = "Bloodrot Pox"
+TOKEN_INERTIA = "Inertia"
+
+# Custo de ativação de itens (Gold/Silver/Copper → comprar 1 carta)
+ITEM_TOKEN_COSTS: dict[str, int] = {
+    TOKEN_GOLD: 2,
+    TOKEN_SILVER: 3,
+    TOKEN_COPPER: 4,
+}
+
+
+def create_token(state: GameState, side: str, name: str, qty: int = 1) -> Notice:
+    """Cria token. Aura vai para auras; item vai para tokens."""
+    card = state.players[side]
+    # Verificar se é aura ou item no carddb (lookup externo via cards)
+    # Por simplicidade: auras são tipos que contêm "Aura", itens contêm "Item"
+    # O caller pode forçar tipo via is_item parameter
+    is_item = name in ITEM_TOKEN_COSTS
+    if is_item:
+        card.add_token(name, qty)
+        return Notice(f"+{qty} {name} (item)")
+    else:
+        for _ in range(qty):
+            card.add_aura(name)
+        return Notice(f"+{qty} {name} (aura)")
+
+
+def remove_token(state: GameState, side: str, name: str, qty: int = 1) -> Notice:
+    """Remove token. Aura remove cópia; item remove quantidade."""
+    p = state.players[side]
+    is_item = name in ITEM_TOKEN_COSTS
+    if is_item:
+        remaining = p.pop_token(name, qty)
+        removed = qty - remaining if remaining < qty else 0
+        return Notice(f"-{removed} {name} (restam {remaining})")
+    else:
+        removed = 0
+        for _ in range(qty):
+            if p.pop_aura(name) is not None:
+                removed += 1
+        return Notice(f"-{removed} {name}")
+
+
+def use_item_token(state: GameState, side: str, name: str, cards: dict[str, Card]) -> Notice:
+    """Ativa item token: paga custo, destroi, compra 1 carta, Go Again."""
+    p = state.players[side]
+    cost = ITEM_TOKEN_COSTS.get(name)
+    if cost is None:
+        raise CombatError(f"{name} não é um item token ativável")
+    if p.tokens.get(name, 0) <= 0:
+        raise CombatError(f"nenhum {name} para ativar")
+    if p.pitch_pool < cost:
+        raise CombatError(f"custo insuficiente ({p.pitch_pool} < {cost})")
+    # Pagar custo e destruir
+    p.pitch_pool -= cost
+    p.pop_token(name, 1)
+    # Comprar 1 carta (será controlado pelo caller via draw manual)
+    return Notice(f"{name} ativado: -{cost}{{r}}, compre 1 carta")
+
+
+def has_aura(player: PlayerState, name: str) -> bool:
+    """Verifica se o jogador controla ao menos 1 cópia da aura."""
+    return bool(player.auras.get(name))
+
+
+def count_auras(player: PlayerState, name: str) -> int:
+    """Conta cópias da aura."""
+    return len(player.auras.get(name, []))
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +278,13 @@ def play_action(
     if p.hero_key.startswith("Briar") and p.non_attack_actions_played == 2:
         p.add_aura(EMBODIMENT_LIGHTNING)
         notices.append(Notice(f"Briar criou {EMBODIMENT_LIGHTNING} (2ª non-attack action)."))
+
+    # Eloquence: destrói, carta ganha Go Again
+    if has_aura(p, TOKEN_ELOQUENCE):
+        p.pop_aura(TOKEN_ELOQUENCE)
+        earned = True  # força Go Again
+        notices.append(Notice(f"{TOKEN_ELOQUENCE} destruído: carta ganhou Go Again."))
+
     return notices
 
 
@@ -210,6 +366,33 @@ def declare_attack(
     link = ChainLink(attacker=side, card_key=card_key, total_damage=total, dominate=dominate)
     state.chain.append(link)
     return link
+
+
+def check_attack_token_triggers(state: GameState, side: str) -> list[Notice]:
+    """Verifica tokens que reagem a ataques (Courage, Quicken, Runechant).
+
+    Consome os tokens e retorna lembretes. O caller aplica os efeitos
+    usando boost_link / set_arcane_on_link conforme os notices retornados.
+    """
+    notices: list[Notice] = []
+    p = state.players[side]
+
+    # Courage: destrói, ataque +1{p}
+    if has_aura(p, TOKEN_COURAGE):
+        p.pop_aura(TOKEN_COURAGE)
+        notices.append(Notice(f"{TOKEN_COURAGE} destruído: ataque +1{{p}}."))
+
+    # Quicken: destrói, ataque ganha Go Again
+    if has_aura(p, TOKEN_QUICKEN):
+        p.pop_aura(TOKEN_QUICKEN)
+        notices.append(Notice(f"{TOKEN_QUICKEN} destruído: ataque ganhou Go Again."))
+
+    # Runechant: destrói, 1 arcane damage
+    if has_aura(p, TOKEN_RUNECHANT):
+        p.pop_aura(TOKEN_RUNECHANT)
+        notices.append(Notice(f"{TOKEN_RUNECHANT} destruído: 1 arcane damage."))
+
+    return notices
 
 
 def boost_link(state: GameState, side: str, amount: int, source_key: str | None = None) -> Notice:

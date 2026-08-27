@@ -236,6 +236,10 @@ def _collect_board_cards(state: GameState, cards: dict[str, Card]) -> list[_Brow
                 label = f"Aura {side}" + (f" [{cnt}]" if cnt else "")
                 result.append(_BrowseCard(idx, key, side, "aura", label))
 
+        for name, qty in p.tokens.items():
+            idx += 1
+            result.append(_BrowseCard(idx, name, side, "token", f"Token {side} x{qty}"))
+
     return result
 
 
@@ -340,15 +344,17 @@ class PlayerPanel(Vertical):
             txt = "(vazio)"
         self.query_one(f"#arsenal-{self.side}", Static).update(f"[bold]Arsenal:[/] {txt}")
 
-        # Auras
+        # Auras + tokens item
         aura_lines = []
         for key, copies in p.auras.items():
             for i, cnt in enumerate(copies):
                 aura_lines.append(f"  {key} (+{cnt})")
+        for name, qty in p.tokens.items():
+            aura_lines.append(f"  {name} x{qty}")
         if not aura_lines:
-            aura_lines.append(" (nenhuma)")
+            aura_lines.append(" (nenhum)")
         self.query_one(f"#auras-{self.side}", Static).update(
-            "[bold]Auras:[/]\n" + "\n".join(aura_lines)
+            "[bold]Auras/Tokens:[/]\n" + "\n".join(aura_lines)
         )
 
         # Equipamentos (exclui Off-Hand, que é exibido na zona de armas)
@@ -653,7 +659,10 @@ class FaBApp(App[None]):
             "card": self._cmd_card,
             "draw": self._cmd_draw,
             "pitch": self._cmd_pitch,
+            "discard": self._cmd_discard,
             "arsenal": self._cmd_arsenal,
+            "token": self._cmd_token,
+            "use": self._cmd_use,
             "play": self._cmd_play,
             "attack": self._cmd_attack,
             "weapon": self._cmd_weapon,
@@ -702,7 +711,11 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]card[/] <carta>            — mostra detalhes da carta")
         self._log_notice("  [bold]draw[/] <carta>           — adiciona carta à mão do ativo")
         self._log_notice("  [bold]pitch[/] <carta>          — dá pitch de uma carta da mão")
+        self._log_notice("  [bold]discard[/] <carta>        — descarta carta da mão")
         self._log_notice("  [bold]arsenal[/] <carta>        — coloca carta no arsenal")
+        self._log_notice("  [bold]token[/] <nome> [qtd]     — cria token (aura ou item)")
+        self._log_notice("  [bold]token remove[/] <nome>    — remove token")
+        self._log_notice("  [bold]use[/] <token>             — ativa item (Gold/Silver/Copper)")
         self._log_notice("  [bold]play[/] <carta>           — joga non-attack action")
         self._log_notice("  [bold]attack[/] <carta>         — declara ataque [dominate=...]")
         self._log_notice("  [bold]weapon[/] [1|2]            — ataca com a arma (índice)")
@@ -913,6 +926,43 @@ class FaBApp(App[None]):
         val = cmb.pitch(self.game_state, self.game_state.active_player, key, self.cards)
         self._log_notice(f"{key} pichada: +{val}{{r}}")
         self._record("pitch", f"{key} → +{val}{{r}}")
+
+    def _cmd_discard(self, args: list[str]) -> None:
+        """discard <carta> — descarta carta da mão para o cemitério."""
+        if not args:
+            raise ValueError("uso: discard <carta>")
+        key = self._resolve_card(" ".join(args))
+        cmb.discard(self.game_state, self.game_state.active_player, key)
+        self._log_notice(f"{key} descartada.")
+        self._record("discard", f"{key} → cemitério")
+
+    def _cmd_token(self, args: list[str]) -> None:
+        """token <nome> [qtd] — cria token; token remove <nome> [qtd] — remove."""
+        if not args:
+            raise ValueError("uso: token <nome> [qtd] ou token remove <nome> [qtd]")
+        if args[0] == "remove":
+            if len(args) < 2:
+                raise ValueError("uso: token remove <nome> [qtd]")
+            name = " ".join(args[1:-1]) if args[-1].isdigit() else " ".join(args[1:])
+            qty = int(args[-1]) if args[-1].isdigit() else 1
+            notice = cmb.remove_token(self.game_state, self.game_state.active_player, name, qty)
+        else:
+            name = " ".join(args[:-1]) if args[-1].isdigit() else " ".join(args)
+            qty = int(args[-1]) if args[-1].isdigit() else 1
+            notice = cmb.create_token(self.game_state, self.game_state.active_player, name, qty)
+        self._log_notice(f"🎯 {notice.text}")
+        self._record("token", notice.text)
+
+    def _cmd_use(self, args: list[str]) -> None:
+        """use <token> — ativa item token (Gold/Silver/Copper)."""
+        if not args:
+            raise ValueError("uso: use <token> (Gold, Silver, Copper)")
+        name = " ".join(args)
+        notice = cmb.use_item_token(
+            self.game_state, self.game_state.active_player, name, self.cards
+        )
+        self._log_notice(f"🎯 {notice.text}")
+        self._record("use", notice.text)
 
     def _cmd_arsenal(self, args: list[str]) -> None:
         """arsenal <carta> — coloca no arsenal."""
@@ -1154,7 +1204,9 @@ class FaBApp(App[None]):
 
     def _cmd_next(self, args: list[str]) -> None:
         """next — encerra o turno do ativo e inicia o do oponente."""
-        cmb.end_turn(self.game_state)
+        end_notices = cmb.end_turn(self.game_state)
+        for n in end_notices:
+            self._log_notice(f"⚡ {n.text}")
         new_active = self.game_state.active_player
         notices = cmb.start_turn(self.game_state, new_active)
         self._log_notice(
@@ -1284,6 +1336,7 @@ class FaBApp(App[None]):
             self._log_notice(f"  Mão ({len(p.hand)}): {p.hand}")
             self._log_notice(f"  Arsenal: {p.arsenal}")
             self._log_notice(f"  Auras: {dict(p.auras)}")
+            self._log_notice(f"  Tokens: {dict(p.tokens)}")
             self._log_notice(f"  Graveyard: {p.graveyard}")
             self._log_notice(f"  Banished: {p.banished}")
             self._log_notice(f"  Equip destruídos: {p.equipment_destroyed}")
