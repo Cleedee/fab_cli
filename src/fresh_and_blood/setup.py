@@ -90,8 +90,18 @@ def apply_setup(state: GameState, setup: dict, cards: dict[str, Card]) -> None:
         if side not in VALID_SIDES:
             raise ValueError(f"lado inválido no setup: {side}")
         occupied: set[str] = set()
+        has_offhand = False
         for key in eqs:
             _validate_key(key, cards, want_equipment=True)
+            card = cards[key]
+            # Off-Hand: vai para equipment_uses + offhand_key, máx. 1 por lado
+            if card.is_offhand:
+                if has_offhand:
+                    raise ValueError(f"Off-Hand duplicado no lado {side}; só é permitido um")
+                state.players[side].offhand_key = key
+                state.players[side].equipment_uses[key] = None
+                has_offhand = True
+                continue
             conflict = _slot_conflict(key, cards, occupied)
             if conflict:
                 raise ValueError(
@@ -126,6 +136,12 @@ def apply_setup(state: GameState, setup: dict, cards: dict[str, Card]) -> None:
             )
         if not has_2h and len(keys) > 2:
             raise ValueError(f"Máximo de 2 armas 1H por lado; {side} tem {len(keys)}")
+        # Validar conflito arma 2H + Off-Hand
+        offhand_key = state.players[side].offhand_key
+        if has_2h and offhand_key:
+            raise ValueError(
+                f"Arma 2H não pode coexistir com Off-Hand ({offhand_key}) no lado {side}"
+            )
         for key in keys:
             _validate_key(key, cards)
             card = cards[key]
@@ -176,6 +192,7 @@ def auto_setup(
 
         # Armas da arena: equipa no máximo 2. Arma 2H ocupa slot único.
         weapons: list[str] = []
+        has_2h = False
         for key in deck.arena:
             if len(weapons) >= 2:
                 break
@@ -187,11 +204,25 @@ def auto_setup(
                 continue
             if "2H" in card.types:
                 weapons = [key]  # substitui qualquer outra arma
+                has_2h = True
                 break
             weapons.append(key)
         p.weapons = weapons
 
+        # Off-Hand: vai para a zona de armas (segundo slot), máx. 1 por lado.
+        # Regra: não pode coexistir com arma 2H.
+        if not has_2h:
+            for key in deck.arena:
+                card = cards.get(key)
+                if card is None or not card.is_offhand or not card.is_equipment:
+                    continue
+                # Off-Hand ocupa um slot de arma; só permite se há espaço
+                if len(weapons) < 2:
+                    p.offhand_key = key
+                    break
+
         # Equipamentos da arena: um por slot (Head, Chest, Arms, Legs)
+        # Off-Hand já foi processado acima (vai para offhand_key + equipment_uses).
         equipped_slots: set[str] = set()
         for key in deck.arena:
             card = cards.get(key)
@@ -201,7 +232,7 @@ def auto_setup(
             if slot is not None and slot in equipped_slots:
                 continue  # já equipou algo neste slot
             p.equipment_uses[key] = None
-            if slot:
+            if slot and slot != "Off-Hand":
                 equipped_slots.add(slot)
         # Mão inicial: embaralha o pool expandido (por quantidade) e pega as primeiras
         pool_expanded = [key for key, qty in deck.deck_pool.items() for _ in range(qty)]

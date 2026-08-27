@@ -233,3 +233,123 @@ def test_equipment_slot_propriedade(cards):
     assert cards["Star Fall"].equipment_slot is None  # arma não tem slot
     # carta não-equipamento
     assert cards["Snatch (red)"].equipment_slot is None
+
+
+def test_offhand_reconhecido(cards):
+    """Cartas Off-Hand são reconhecidas corretamente."""
+    bastion = cards.get("Bastion of Duty")
+    assert bastion is not None
+    assert bastion.is_offhand
+    assert bastion.is_equipment
+    assert bastion.equipment_slot == "Off-Hand"
+    # Arma não é Off-Hand
+    assert not cards["Star Fall"].is_offhand
+    # Carta normal não é Off-Hand
+    assert not cards["Snatch (red)"].is_offhand
+
+
+def test_apply_setup_offhand_vai_para_offhand_key(cards, heroes):
+    """apply_setup coloca Off-Hand em offhand_key e equipment_uses."""
+    state = new_game(heroes[0], heroes[1], "A")
+    setup = {"equipment": {"A": ["Bastion of Duty"]}}
+    apply_setup(state, setup, cards)
+    p = state.players["A"]
+    assert p.offhand_key == "Bastion of Duty"
+    assert "Bastion of Duty" in p.equipment_uses
+
+
+def test_apply_setup_offhand_duplicado_levanta_erro(cards, heroes):
+    """apply_setup rejeita dois Off-Hand no mesmo lado."""
+    state = new_game(heroes[0], heroes[1], "A")
+    setup = {"equipment": {"A": ["Bastion of Duty", "Aurum Aegis"]}}
+    with pytest.raises(ValueError, match="Off-Hand duplicado"):
+        apply_setup(state, setup, cards)
+
+
+def test_apply_setup_offhand_com_arma_2h_levanta_erro(cards, heroes):
+    """apply_setup rejeita arma 2H + Off-Hand no mesmo lado."""
+    state = new_game(heroes[0], heroes[1], "A")
+    # Encontrar uma arma 2H no registro
+    weapon_2h = None
+    for k, c in cards.items():
+        if c.is_weapon and "2H" in c.types:
+            weapon_2h = k
+            break
+    assert weapon_2h is not None, "Nenhuma arma 2H encontrada no registro"
+    setup = {
+        "equipment": {"A": ["Bastion of Duty"]},
+        "weapons": {"A": [weapon_2h]},
+    }
+    with pytest.raises(ValueError, match="Arma 2H não pode coexistir com Off-Hand"):
+        apply_setup(state, setup, cards)
+
+
+def test_auto_setup_offhand(cards, heroes):
+    """auto_setup equipa Off-Hand corretamente quando há espaço."""
+    from fresh_and_blood.deck import Decklist
+
+    deck_a = Decklist(
+        hero="Briar, Warden of Thorns",
+        source="test",
+        arena=[
+            "Scepter of Pain",
+            "Blossom of Spring",
+            "Blade Beckoner Helm",
+            "Blade Beckoner Boots",
+            "Bastion of Duty",
+        ],
+        deck_pool={"Snatch (red)": 2, "Ravenous Rabble (red)": 2},
+    )
+    deck_b = Decklist(
+        hero="Ira, Crimson Haze",
+        source="test",
+        arena=[
+            "Harmonized Kodachi",
+            "Blossom of Spring",
+            "Blade Beckoner Helm",
+            "Blade Beckoner Boots",
+        ],
+        deck_pool={"Snatch (red)": 2, "Ravenous Rabble (red)": 2},
+    )
+    state = new_game(heroes[0], heroes[1], "A")
+    auto_setup(state, deck_a, deck_b, cards, hand_size=4, seed=42)
+    p = state.players["A"]
+    assert p.offhand_key == "Bastion of Duty"
+    assert "Bastion of Duty" in p.equipment_uses
+    assert "Scepter of Pain" in p.weapons
+
+
+def test_auto_setup_offhand_com_arma_2h_nao_equipa(cards, heroes):
+    """auto_setup não equipa Off-Hand quando arma 2H ocupa os slots."""
+    from fresh_and_blood.deck import Decklist
+
+    deck_a = Decklist(
+        hero="Briar, Warden of Thorns",
+        source="test",
+        arena=[
+            "Star Fall",
+            "Blossom of Spring",
+            "Blade Beckoner Helm",
+            "Blade Beckoner Boots",
+            "Bastion of Duty",
+        ],
+        deck_pool={"Snatch (red)": 2, "Ravenous Rabble (red)": 2},
+    )
+    deck_b = Decklist(
+        hero="Ira, Crimson Haze",
+        source="test",
+        arena=[
+            "Harmonized Kodachi",
+            "Blossom of Spring",
+            "Blade Beckoner Helm",
+            "Blade Beckoner Boots",
+        ],
+        deck_pool={"Snatch (red)": 2, "Ravenous Rabble (red)": 2},
+    )
+    state = new_game(heroes[0], heroes[1], "A")
+    auto_setup(state, deck_a, deck_b, cards, hand_size=4, seed=42)
+    p = state.players["A"]
+    # Star Fall é 2H; Off-Hand não deve ser equipado
+    assert p.offhand_key is None
+    # Mas Off-Hand ainda pode estar em equipment_uses para defesa
+    assert "Bastion of Duty" in p.equipment_uses

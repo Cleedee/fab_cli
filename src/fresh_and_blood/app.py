@@ -207,9 +207,16 @@ def _collect_board_cards(state: GameState, cards: dict[str, Card]) -> list[_Brow
             slot = "2H" if c and "2H" in c.types else "1H"
             result.append(_BrowseCard(idx, key, side, "weapon", f"Wpn({slot})"))
 
+        # Off-Hand: exibido na zona de armas (segundo slot)
+        if p.offhand_key and p.offhand_key not in p.equipment_destroyed:
+            idx += 1
+            result.append(_BrowseCard(idx, p.offhand_key, side, "weapon", "Off-Hand"))
+
         for key in p.equipment_uses:
             if key in p.equipment_destroyed:
                 continue
+            if p.offhand_key and key == p.offhand_key:
+                continue  # já listado na zona de armas
             idx += 1
             c = cards.get(key)
             slot = c.equipment_slot if c else "?"
@@ -296,6 +303,14 @@ class PlayerPanel(Vertical):
                 weapon_lines.append(f"  {txt}  [dim]({slot})[/]")
             else:
                 weapon_lines.append(f"  {key} [?]")
+        # Off-Hand: exibido na zona de armas
+        if p.offhand_key:
+            card = cards.get(p.offhand_key)
+            if card and p.offhand_key not in p.equipment_destroyed:
+                txt = _card_display(p.offhand_key, card)
+                weapon_lines.append(f"  {txt}  [dim](Off-Hand)[/]")
+            elif p.offhand_key not in p.equipment_destroyed:
+                weapon_lines.append(f"  {p.offhand_key} [?]")
         if not weapon_lines:
             weapon_lines.append(" (nenhuma)")
         self.query_one(f"#weapon-{self.side}", Static).update(
@@ -336,9 +351,11 @@ class PlayerPanel(Vertical):
             "[bold]Auras:[/]\n" + "\n".join(aura_lines)
         )
 
-        # Equipamentos
+        # Equipamentos (exclui Off-Hand, que é exibido na zona de armas)
         eq_lines = []
         for key, uses in p.equipment_uses.items():
+            if p.offhand_key and key == p.offhand_key:
+                continue  # já listado na zona de armas
             status = f"{uses} usos" if uses is not None else "∞"
             destroyed = " [red][Destruído][/]" if key in p.equipment_destroyed else ""
             used = " [yellow](usado)[/]" if key in p.equipment_used_this_turn else ""

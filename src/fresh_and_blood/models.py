@@ -47,15 +47,22 @@ class Card:
         return "Weapon" in self.types
 
     @property
+    def is_offhand(self) -> bool:
+        """Equipamento que ocupa o segundo slot de arma (ex.: escudos, grimórios)."""
+        return "Off-Hand" in self.types
+
+    @property
     def is_equipment(self) -> bool:
         return "Equipment" in self.types
 
     @property
     def equipment_slot(self) -> str | None:
-        """Slot do equipamento: Head, Chest, Arms ou Legs. None se não tem slot."""
+        """Slot do equipamento: Head, Chest, Arms, Legs ou Off-Hand. None se não tem slot."""
         for slot in ("Head", "Chest", "Arms", "Legs"):
             if slot in self.types:
                 return slot
+        if "Off-Hand" in self.types:
+            return "Off-Hand"
         return None
 
     @property
@@ -94,6 +101,9 @@ class PlayerState:
     equipment_destroyed: list[str] = field(default_factory=list)
     # armas em jogo: 0-2 cartas. Arma 2H ocupa slot único (fora o limite de 2).
     weapons: list[str] = field(default_factory=list)
+    # Off-Hand: equipamento que ocupa o segundo slot de arma (ex.: escudo).
+    # Só pode haver um; não pode coexistir com arma 2H.
+    offhand_key: str | None = None
 
     # --- contadores por turno (resetados em start_turn) ---
     hero_ability_used: bool = False
