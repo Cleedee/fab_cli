@@ -1,0 +1,40 @@
+# Decklist importada de: https://fabrary.net/decks/01KBZGK1BSDZ2FR9SADC0ES2A2
+hero: "Kayo, Strong-arm"
+format: silver-age
+source: "https://fabrary.net/decks/01KBZGK1BSDZ2FR9SADC0ES2A2"
+
+# Arma + equipamentos disponíveis
+arena:
+  - "Barkbone Strapping"
+  - "Flat Trackers"
+  - "Horns of the Despised"
+  - "Mandible Claw"
+  - "Mightybone Knuckles"
+
+# Pool de deck
+deck_pool:
+  - {qty: 2, card: "Cruel Ambition (red)"}
+  - {qty: 2, card: "Mocking Blow (red)"}
+  - {qty: 2, card: "On the Horizon (red)"}
+  - {qty: 2, card: "Prime the Crowd (red)"}
+  - {qty: 2, card: "Revolting Gesture (red)"}
+  - {qty: 2, card: "Strongest Survive (red)"}
+  - {qty: 2, card: "Villainous Pose (red)"}
+  - {qty: 2, card: "Aggressive Pounce (red)"}
+  - {qty: 2, card: "Awakening Bellow (red)"}
+  - {qty: 2, card: "Asking for Trouble (yellow)"}
+  - {qty: 2, card: "Disdainful Delight (yellow)"}
+  - {qty: 2, card: "Mocking Blow (yellow)"}
+  - {qty: 2, card: "Aggressive Pounce (yellow)"}
+  - {qty: 2, card: "Awakening Bellow (yellow)"}
+  - {qty: 2, card: "Booze! (blue)"}
+  - {qty: 2, card: "Flex Strength (blue)"}
+  - {qty: 2, card: "Goon Beatdown (blue)"}
+  - {qty: 2, card: "Instill Fear (blue)"}
+  - {qty: 2, card: "Mocking Blow (blue)"}
+  - {qty: 2, card: "Offensive Behavior (blue)"}
+  - {qty: 2, card: "Overload (blue)"}
+  - {qty: 2, card: "Aggressive Pounce (blue)"}
+  - {qty: 2, card: "Awakening Bellow (blue)"}
+  - {qty: 2, card: "Barraging Beatdown (blue)"}
+  - {qty: 2, card: "Barraging Big Horn (blue)"}

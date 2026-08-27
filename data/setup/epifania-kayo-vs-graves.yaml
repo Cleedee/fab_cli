@@ -1,0 +1,23 @@
+{
+  "hands":     {
+    "A": [
+      "Snatch (red)", "Sizzle (red)"
+    ], 
+    "B": [
+      "Swabbie (yellow)",
+      "Golden Tipple (yellow)"
+    ]
+  },
+  "arsenal":   {"A": null, "B": null},
+  "equipment": {
+    "A": ["Blade Beckoner Helm"], 
+    "B": [
+      "Myrkhellir Helm", 
+      "Garland of Spring",
+      "Mage Master Boots",
+      "Washed Up Wave"
+    ]
+  },
+  "pitch_pool": {"A": 0, "B": 0},
+  "weapons":   {"B": "Compass of Sunken Depths"}
+}

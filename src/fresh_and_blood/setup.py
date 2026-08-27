@@ -128,26 +128,35 @@ def apply_setup(state: GameState, setup: dict, cards: dict[str, Card]) -> None:
             continue
         if isinstance(keys, str):
             keys = [keys]
-        # Garantir que só há uma arma 2H ou no máximo 2 armas 1H
-        has_2h = any("2H" in cards[k].types for k in keys if k in cards)
-        if has_2h and len(keys) > 1:
-            raise ValueError(
-                f"Arma 2H ocupa ambos os slots; não pode haver outra arma no lado {side}"
-            )
-        if not has_2h and len(keys) > 2:
-            raise ValueError(f"Máximo de 2 armas 1H por lado; {side} tem {len(keys)}")
-        # Validar conflito arma 2H + Off-Hand
-        offhand_key = state.players[side].offhand_key
-        if has_2h and offhand_key:
-            raise ValueError(
-                f"Arma 2H não pode coexistir com Off-Hand ({offhand_key}) no lado {side}"
-            )
+        # Separar armas reais de Off-Hand (ambos ocupam zona de armas)
+        weapon_keys = []
+        offhand_found = False
         for key in keys:
             _validate_key(key, cards)
             card = cards[key]
-            if not card.is_weapon:
-                raise ValueError(f"{key} não é uma arma")
-        state.players[side].weapons = list(keys)
+            if card.is_offhand:
+                if offhand_found:
+                    raise ValueError(f"Off-Hand duplicado no lado {side}")
+                state.players[side].offhand_key = key
+                state.players[side].equipment_uses[key] = None
+                offhand_found = True
+            elif card.is_weapon:
+                weapon_keys.append(key)
+            else:
+                raise ValueError(f"{key} não é uma arma nem Off-Hand")
+        # Validar slots de arma (só armas reais contam)
+        has_2h = any("2H" in cards[k].types for k in weapon_keys if k in cards)
+        if has_2h and len(weapon_keys) > 1:
+            raise ValueError(
+                f"Arma 2H ocupa ambos os slots; não pode haver outra arma no lado {side}"
+            )
+        if not has_2h and len(weapon_keys) > 2:
+            raise ValueError(f"Máximo de 2 armas 1H por lado; {side} tem {len(weapon_keys)}")
+        # Validar conflito arma 2H + Off-Hand (em weapons OU equipment)
+        existing_offhand = offhand_found or state.players[side].offhand_key
+        if has_2h and existing_offhand:
+            raise ValueError(f"Arma 2H não pode coexistir com Off-Hand no lado {side}")
+        state.players[side].weapons = weapon_keys
 
 
 def _weapon_slot_label(key: str, cards: dict[str, Card]) -> str:
