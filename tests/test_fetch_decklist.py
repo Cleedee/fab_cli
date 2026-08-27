@@ -12,9 +12,9 @@ from scripts.fetch_decklist import (
     url_to_filename,
 )
 
-from fresh_and_blood.deck import load_decklist
-from fresh_and_blood.fabrary import card_key as _fabrary_card_key
-from fresh_and_blood.fabrary import pitch_to_color as _pitch_to_color
+from flesh_and_blood.deck import load_decklist
+from flesh_and_blood.fabrary import card_key as _fabrary_card_key
+from flesh_and_blood.fabrary import pitch_to_color as _pitch_to_color
 
 SAMPLE_HTML = """
 <html><body>

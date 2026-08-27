@@ -2,13 +2,13 @@
 
 import pytest
 
-from fresh_and_blood.app import (
+from flesh_and_blood.app import (
     _BrowseCard,
     _BrowseIndex,
     _collect_board_cards,
 )
-from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.models import Hero, new_game
+from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.models import Hero, new_game
 
 
 @pytest.fixture()

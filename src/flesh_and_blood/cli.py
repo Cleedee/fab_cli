@@ -8,11 +8,11 @@ from pathlib import Path
 
 import yaml
 
-from fresh_and_blood.app import Matchup, launch
-from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.deck import hero_from_deck, load_decklist, validate, weapon_from_deck
-from fresh_and_blood.models import new_game
-from fresh_and_blood.setup import apply_setup, auto_setup, load_setup_file, setup_weapons
+from flesh_and_blood.app import Matchup, launch
+from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.deck import hero_from_deck, load_decklist, validate, weapon_from_deck
+from flesh_and_blood.models import new_game
+from flesh_and_blood.setup import apply_setup, auto_setup, load_setup_file, setup_weapons
 
 DECK_DIR = Path(__file__).resolve().parents[2] / "data" / "decks"
 

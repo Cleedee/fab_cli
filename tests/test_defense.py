@@ -1,7 +1,7 @@
 """Testes do sugeridor de defesa."""
 
-from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.defense import ValueWeights, card_value, suggest_defense
+from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.defense import ValueWeights, card_value, suggest_defense
 
 
 def test_bloqueio_total_mais_barato():

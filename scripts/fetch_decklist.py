@@ -24,8 +24,8 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from fresh_and_blood.fabrary import card_key as _fabrary_card_key
-from fresh_and_blood.fabrary import get_deck as _fetch_fabrary_graphql
+from flesh_and_blood.fabrary import card_key as _fabrary_card_key
+from flesh_and_blood.fabrary import get_deck as _fetch_fabrary_graphql
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "data" / "decks"
 

@@ -5,10 +5,10 @@ import json
 import pytest
 import yaml
 
-from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.deck import hero_from_deck, load_decklist
-from fresh_and_blood.models import new_game
-from fresh_and_blood.setup import apply_setup, auto_setup, load_setup_file, setup_weapons
+from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.deck import hero_from_deck, load_decklist
+from flesh_and_blood.models import new_game
+from flesh_and_blood.setup import apply_setup, auto_setup, load_setup_file, setup_weapons
 
 
 @pytest.fixture(scope="module")
@@ -286,7 +286,7 @@ def test_apply_setup_offhand_com_arma_2h_levanta_erro(cards, heroes):
 
 def test_auto_setup_offhand(cards, heroes):
     """auto_setup equipa Off-Hand corretamente quando há espaço."""
-    from fresh_and_blood.deck import Decklist
+    from flesh_and_blood.deck import Decklist
 
     deck_a = Decklist(
         hero="Briar, Warden of Thorns",
@@ -321,7 +321,7 @@ def test_auto_setup_offhand(cards, heroes):
 
 def test_auto_setup_offhand_com_arma_2h_nao_equipa(cards, heroes):
     """auto_setup não equipa Off-Hand quando arma 2H ocupa os slots."""
-    from fresh_and_blood.deck import Decklist
+    from flesh_and_blood.deck import Decklist
 
     deck_a = Decklist(
         hero="Briar, Warden of Thorns",

@@ -2,9 +2,9 @@
 
 import pytest
 
-from fresh_and_blood.attack import plan_attack
-from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.models import Hero, new_game
+from flesh_and_blood.attack import plan_attack
+from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.models import Hero, new_game
 
 BRIAR = Hero(
     key="Briar, Warden of Thorns",

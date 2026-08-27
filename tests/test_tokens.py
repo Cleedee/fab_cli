@@ -2,8 +2,8 @@
 
 import pytest
 
-from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.combat import (
+from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.combat import (
     CombatError,
     create_token,
     end_turn,
@@ -11,8 +11,8 @@ from fresh_and_blood.combat import (
     start_turn,
     use_item_token,
 )
-from fresh_and_blood.deck import hero_from_deck, load_decklist
-from fresh_and_blood.models import GameState, new_game
+from flesh_and_blood.deck import hero_from_deck, load_decklist
+from flesh_and_blood.models import GameState, new_game
 
 
 @pytest.fixture(scope="module")
@@ -257,7 +257,7 @@ def test_end_turn_muda_active_player(heroes):
 
 
 def test_courage_trigger_attack(heroes):
-    from fresh_and_blood.combat import check_attack_token_triggers
+    from flesh_and_blood.combat import check_attack_token_triggers
 
     state = _state(heroes)
     create_token(state, "A", "Courage")
@@ -267,7 +267,7 @@ def test_courage_trigger_attack(heroes):
 
 
 def test_quicken_trigger_attack(heroes):
-    from fresh_and_blood.combat import check_attack_token_triggers
+    from flesh_and_blood.combat import check_attack_token_triggers
 
     state = _state(heroes)
     create_token(state, "A", "Quicken")
@@ -277,7 +277,7 @@ def test_quicken_trigger_attack(heroes):
 
 
 def test_runechant_trigger_attack(heroes):
-    from fresh_and_blood.combat import check_attack_token_triggers
+    from flesh_and_blood.combat import check_attack_token_triggers
 
     state = _state(heroes)
     create_token(state, "A", "Runechant")
@@ -287,7 +287,7 @@ def test_runechant_trigger_attack(heroes):
 
 
 def test_no_attack_tokens(heroes):
-    from fresh_and_blood.combat import check_attack_token_triggers
+    from flesh_and_blood.combat import check_attack_token_triggers
 
     state = _state(heroes)
     notices = check_attack_token_triggers(state, "A")
@@ -303,7 +303,7 @@ def test_eloquence_trigger_play_action(heroes, cards):
     state.players["A"].pitch_pool = 5
     state.players["A"].hand.append("Earthlore Surge (red)")
     start_turn(state, "A")
-    from fresh_and_blood.combat import play_action
+    from flesh_and_blood.combat import play_action
 
     notices = play_action(state, "A", "Earthlore Surge (red)", cards)
     assert any("Eloquence" in n.text for n in notices)

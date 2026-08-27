@@ -1,4 +1,4 @@
-# fresh-and-blood
+# flesh-and-blood
 
 Assistente de decisão para **Flesh and Blood TCG** — formato **Silver Age**.
 Matchup inicial: **Briar, Warden of Thorns** vs. **Enigma** (ambos jovens, 20 vida / 4 intelecto).
@@ -16,7 +16,7 @@ Matchup inicial: **Briar, Warden of Thorns** vs. **Enigma** (ambos jovens, 20 vi
 
 ```bash
 git clone <url-do-repositorio>
-cd fresh-and-blood
+cd flesh-and-blood
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 ```
@@ -238,7 +238,7 @@ log                             → histórico completo
 ## Projeto
 
 ```
-src/fresh_and_blood/
+src/flesh_and_blood/
 ├── __init__.py          — versão do pacote
 ├── app.py               — TUI Textual (Fase 3)
 ├── attack.py            — planejador de linha de ataque (Fase 2)

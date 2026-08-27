@@ -1,7 +1,7 @@
 import pytest
 
-from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.combat import (
+from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.combat import (
     CombatError,
     boost_link,
     deal_arcane,
@@ -17,7 +17,7 @@ from fresh_and_blood.combat import (
     use_equipment_defense,
     ward_value,
 )
-from fresh_and_blood.models import Card, ChainLink, Color, GameState, Hero, new_game
+from flesh_and_blood.models import Card, ChainLink, Color, GameState, Hero, new_game
 
 
 @pytest.fixture(scope="module")

@@ -14,7 +14,7 @@ não simulador de regras completo.
 
 from dataclasses import dataclass, field
 
-from fresh_and_blood.models import Card, GameState
+from flesh_and_blood.models import Card, GameState
 
 # Bônus de poder concedido por non-attack actions do pool atual.
 BUFF_POWER = {

@@ -168,7 +168,7 @@ wheels = [
 ]
 
 [[package]]
-name = "fresh-and-blood"
+name = "flesh-and-blood"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

@@ -2,7 +2,7 @@
 
 import pytest
 
-from fresh_and_blood.probabilities import (
+from flesh_and_blood.probabilities import (
     hypergeom_pmf,
     prob_at_least_one,
     prob_exactly,
@@ -46,7 +46,7 @@ def test_pitch_azul():
 def test_prob_at_least_certeza_quando_min_count_zero():
     # P(pegar ao menos 0) = 1.0 sempre
     assert prob_at_least_one(40, 5, 10) < 1.0  # sanity: P(>=1) < 1
-    from fresh_and_blood.probabilities import prob_at_least
+    from flesh_and_blood.probabilities import prob_at_least
 
     assert prob_at_least(40, 5, 10, 0) == 1.0
     assert prob_at_least(40, 0, 10, 0) == 1.0

@@ -17,14 +17,14 @@ from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, Input, RichLog, Static
 
-from fresh_and_blood import attack as atk
-from fresh_and_blood import combat as cmb
-from fresh_and_blood import defense as dfs
-from fresh_and_blood import probabilities as prob
-from fresh_and_blood import recorder as rec
-from fresh_and_blood import review as rvw
-from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.models import (
+from flesh_and_blood import attack as atk
+from flesh_and_blood import combat as cmb
+from flesh_and_blood import defense as dfs
+from flesh_and_blood import probabilities as prob
+from flesh_and_blood import recorder as rec
+from flesh_and_blood import review as rvw
+from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.models import (
     Card,
     GameState,
     Hero,

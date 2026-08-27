@@ -1,5 +1,5 @@
 [project]
-name = "fresh-and-blood"
+name = "flesh-and-blood"
 version = "0.1.0"
 description = "Assistente de decisão para Flesh and Blood (Silver Age) no terminal"
 requires-python = ">=3.11"
@@ -9,7 +9,7 @@ dependencies = ["PyYAML>=6.0", "textual>=8.0", "requests>=2.31"]
 dev = ["pytest>=8.0", "ruff>=0.6"]
 
 [project.scripts]
-fab = "fresh_and_blood.cli:main"
+fab = "flesh_and_blood.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]

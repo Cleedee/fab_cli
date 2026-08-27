@@ -9,7 +9,7 @@ uma heurística configurável — não é verdade de mesa.
 from dataclasses import dataclass
 from itertools import combinations
 
-from fresh_and_blood.models import Card
+from flesh_and_blood.models import Card
 
 MAX_ENUM_CARDS = 10
 EQUIPMENT_USE_COST = 0.25

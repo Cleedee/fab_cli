@@ -41,7 +41,7 @@ python scripts/build_cards.py --dataset-dir <caminho>/json/english
   as fixtures carregam `load_cards()` e `data/decks/*_sa.yaml`.
 - Nunca commitar dados gerados por `build_cards.py` ou `fetch_decklist.py`.
 
-## Arquitetura (`src/fresh_and_blood/`)
+## Arquitetura (`src/flesh_and_blood/`)
 
 | Módulo | Responsabilidade |
 |---|---|

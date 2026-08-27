@@ -2,9 +2,9 @@
 
 import pytest
 
-from fresh_and_blood.models import GameState, Hero, new_game
-from fresh_and_blood.recorder import SessionLog, find_logs, load_session, save_session
-from fresh_and_blood.review import compute_metrics, replay_summary
+from flesh_and_blood.models import GameState, Hero, new_game
+from flesh_and_blood.recorder import SessionLog, find_logs, load_session, save_session
+from flesh_and_blood.review import compute_metrics, replay_summary
 
 BRIAR = Hero(
     key="Briar, Warden of Thorns",

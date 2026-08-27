@@ -1,6 +1,6 @@
 import pytest
 
-from fresh_and_blood.models import (
+from flesh_and_blood.models import (
     Card,
     ChainLink,
     Color,
@@ -104,7 +104,7 @@ def test_pitch_and_pay():
 
 
 def test_pay_cost_requires_resources():
-    from fresh_and_blood.models import PlayerState
+    from flesh_and_blood.models import PlayerState
 
     player = PlayerState(hero_key="Enigma", pitch_pool=2)
     pay_cost(player, 2)

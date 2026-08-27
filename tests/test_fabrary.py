@@ -1,6 +1,6 @@
 """Testes do módulo fabrary.py (cliente Fabrary compartilhado)."""
 
-from fresh_and_blood.fabrary import card_key, extract_card_data, pitch_to_color
+from flesh_and_blood.fabrary import card_key, extract_card_data, pitch_to_color
 
 
 def test_pitch_to_color():

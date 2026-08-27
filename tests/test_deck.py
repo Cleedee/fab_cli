@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.deck import (
+from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.deck import (
     Decklist,
     allowed_types_for,
     hero_from_deck,
@@ -49,7 +49,7 @@ def test_unknown_card_is_rejected(cards) -> None:
 
 
 def test_sa_illegal_card_is_rejected(cards) -> None:
-    from fresh_and_blood.models import Card
+    from flesh_and_blood.models import Card
 
     illegal = Card(
         key="Rosetta Thorn",
@@ -102,7 +102,7 @@ def test_weapon_from_deck_returns_first_weapon(cards) -> None:
 
 def test_allowed_types_fallback_para_heroi_novo(cards) -> None:
     """Herói não mapeado usa os types do card do herói (menos Hero/Young)."""
-    from fresh_and_blood.models import Card
+    from flesh_and_blood.models import Card
 
     novo = Card(
         key="Nova",

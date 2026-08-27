@@ -1,5 +1,5 @@
-from fresh_and_blood.carddb import load_cards
-from fresh_and_blood.models import Color
+from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.models import Color
 
 
 def test_registry_loads() -> None:
