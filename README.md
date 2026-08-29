@@ -187,7 +187,9 @@ Exemplo: `prob 3 40 7` → chance de comprar ao menos 1 das 3 cópias em 7 compr
 
 | Comando | Descrição |
 |---|---|
-| `card <carta\|número>` | Mostra detalhes completos de uma carta (custo, poder, texto, keywords) |
+| `board [filtros]` | Abre uma janela modal com as cartas em jogo e nas mãos. Filtros combináveis: `hand`, `field`, `a`, `b`. Navegar com ↑/↓, fechar com Esc ou `q` |
+| `read [carta\|N]` | Abre uma janela modal de detalhes. Sem argumento abre o board; `<carta>` busca no registro; `<N>` é a carta N da mão do ativo |
+| `card <carta\|número>` | Mostra detalhes completos de uma carta no log (custo, poder, texto, keywords) |
 | `status` | Log completo do estado dos dois jogadores e chain |
 | `clear` | Limpa a área de notificações |
 | `undo` | Desfaz a última ação que alterou o estado |

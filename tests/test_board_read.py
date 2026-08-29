@@ -4,8 +4,8 @@ import pytest
 
 from flesh_and_blood.app import (
     _BrowseCard,
-    _BrowseIndex,
     _collect_board_cards,
+    _entry_summary,
 )
 from flesh_and_blood.carddb import load_cards
 from flesh_and_blood.models import Hero, new_game
@@ -41,56 +41,29 @@ def game_with_cards(empty_game):
     return gs
 
 
-# ── _BrowseIndex ───────────────────────────────────────────────────
+# ── _entry_summary ────────────────────────────────────────────────
 
 
-def test_browse_index_get():
-    cards_list = [
-        _BrowseCard(1, "A", "A", "hand", "Mão A"),
-        _BrowseCard(2, "B", "A", "hand", "Mão A"),
-    ]
-    idx = _BrowseIndex(cards_list)
-    assert idx.get().idx == 1
-    assert idx.total == 2
+def test_entry_summary_com_card(cards):
+    entry = _BrowseCard(3, "Snatch (red)", "A", "hand", "Mão A")
+    summary = _entry_summary(entry, cards["Snatch (red)"])
+    assert "[3]" in summary
+    assert "Mão A" in summary
+    assert "Snatch (red)" in summary
 
 
-def test_browse_index_next():
-    cards_list = [
-        _BrowseCard(1, "A", "A", "hand", "Mão A"),
-        _BrowseCard(2, "B", "A", "hand", "Mão A"),
-        _BrowseCard(3, "C", "B", "hand", "Mão B"),
-    ]
-    idx = _BrowseIndex(cards_list)
-    assert idx.get().idx == 1
-    bc = idx.next()
-    assert bc is not None and bc.idx == 2
-    bc = idx.next()
-    assert bc is not None and bc.idx == 3
-    # No fim da lista
-    bc = idx.next()
-    assert bc is not None and bc.idx == 3  # permanece
+def test_entry_summary_sem_card(cards):
+    entry = _BrowseCard(1, "Carta Desconhecida", "B", "aura", "Aura B")
+    summary = _entry_summary(entry, None)
+    assert "[1]" in summary
+    assert "Carta Desconhecida" in summary
 
 
-def test_browse_index_prev():
-    cards_list = [
-        _BrowseCard(1, "A", "A", "hand", "Mão A"),
-        _BrowseCard(2, "B", "A", "hand", "Mão A"),
-    ]
-    idx = _BrowseIndex(cards_list, current=1)
-    assert idx.get().idx == 2
-    bc = idx.prev()
-    assert bc is not None and bc.idx == 1
-    # No início
-    bc = idx.prev()
-    assert bc is not None and bc.idx == 1  # permanece
-
-
-def test_browse_index_empty():
-    idx = _BrowseIndex([])
-    assert idx.get() is None
-    assert idx.next() is None
-    assert idx.prev() is None
-    assert idx.total == 0
+def test_entry_summary_equipamento(cards):
+    entry = _BrowseCard(2, "Nullrune Boots", "B", "equipment", "Legs")
+    summary = _entry_summary(entry, cards["Nullrune Boots"])
+    assert "Legs" in summary
+    assert "Nullrune Boots" in summary
 
 
 # ── _collect_board_cards ───────────────────────────────────────────

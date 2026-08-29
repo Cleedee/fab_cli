@@ -15,7 +15,8 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Input, RichLog, Static
+from textual.screen import ModalScreen
+from textual.widgets import Footer, Header, Input, ListItem, ListView, RichLog, Static
 
 from flesh_and_blood import attack as atk
 from flesh_and_blood import combat as cmb
@@ -166,31 +167,22 @@ class _BrowseCard:
     label: str  # ex: "Wpn", "Head", "hand A", "Arsenal", "Aura"
 
 
-@dataclass
-class _BrowseIndex:
-    """Índice de cartas para navegação board/read."""
-
-    cards: list[_BrowseCard]
-    current: int = 0  # índice no cards (0-based)
-
-    @property
-    def total(self) -> int:
-        return len(self.cards)
-
-    def get(self) -> _BrowseCard | None:
-        if 0 <= self.current < len(self.cards):
-            return self.cards[self.current]
-        return None
-
-    def next(self) -> _BrowseCard | None:
-        if self.current < len(self.cards) - 1:
-            self.current += 1
-        return self.get()
-
-    def prev(self) -> _BrowseCard | None:
-        if self.current > 0:
-            self.current -= 1
-        return self.get()
+def _entry_summary(entry: _BrowseCard, card: Card | None) -> str:
+    """Linha resumida de uma carta (lista do modal)."""
+    parts: list[str] = []
+    if card is not None:
+        if card.power is not None:
+            parts.append(f"{card.power}{{p}}")
+        if card.defense is not None:
+            parts.append(f"{card.defense}{{d}}")
+        if card.cost:
+            parts.append(f"{card.cost}{{r}}")
+        if card.keywords:
+            parts.append(", ".join(card.keywords))
+    txt = f"[{entry.idx}] [dim]{entry.label}:[/] [bold]{entry.key}[/]"
+    if parts:
+        txt += " — " + " — ".join(parts)
+    return txt
 
 
 def _collect_board_cards(state: GameState, cards: dict[str, Card]) -> list[_BrowseCard]:
@@ -376,6 +368,128 @@ class PlayerPanel(Vertical):
         )
 
 
+# ── Modal de cartas ────────────────────────────────────────────────
+
+
+class _CardListItem(ListItem):
+    """Item da ListView com referência à carta correspondente."""
+
+    def __init__(self, entry: _BrowseCard, summary: str, **kwargs) -> None:
+        super().__init__(Static(summary, markup=True), **kwargs)
+        self.entry = entry
+
+
+class CardBrowser(ModalScreen[None]):
+    """Janela modal para navegar cartas (board) ou ver detalhes (read).
+
+    Lista as cartas à esquerda com resumo (índice, seção, poder/defesa);
+    detalhes completos à direita, atualizados ao navegar com as setas.
+    Fecha com Esc ou q.
+    """
+
+    DEFAULT_CSS = """
+    CardBrowser {
+        align: center middle;
+    }
+
+    #browser-box {
+        width: 92%;
+        height: 92%;
+        border: heavy $primary;
+        background: $surface;
+        padding: 0 1;
+    }
+
+    #browser-title {
+        height: 3;
+        content-align: left middle;
+        text-style: bold;
+    }
+
+    #browser-hint {
+        height: 1;
+        color: $text-muted;
+        content-align: center middle;
+    }
+
+    #browser-body {
+        height: 1fr;
+    }
+
+    #browser-list-col {
+        width: 42%;
+        min-width: 34;
+        border: round $secondary;
+        margin: 0 1 0 0;
+    }
+
+    #browser-list {
+        height: 1fr;
+    }
+
+    #browser-detail-col {
+        width: 58%;
+        min-width: 40;
+        border: round $secondary;
+        padding: 0 1;
+        overflow-y: auto;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "dismiss", "Fechar", priority=True),
+        Binding("q", "dismiss", "Fechar", priority=True),
+    ]
+
+    def __init__(
+        self,
+        entries: list[_BrowseCard],
+        card_db: dict[str, Card],
+        title: str = "Cartas",
+        initial: int | None = None,
+    ) -> None:
+        super().__init__()
+        self._entries = entries
+        self._db = card_db
+        self._title = title
+        self._initial = initial
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="browser-box"):
+            title = f"[bold]{self._title}[/]"
+            if len(self._entries) > 1:
+                title += f" — [{len(self._entries)} cartas]"
+            yield Static(title, id="browser-title")
+            with Horizontal(id="browser-body"):
+                with Vertical(id="browser-list-col"):
+                    yield ListView(id="browser-list")
+                with Vertical(id="browser-detail-col"):
+                    yield Static("", id="browser-details", markup=True)
+            yield Static("↑/↓ navegar · Esc/q fechar", id="browser-hint")
+
+    def on_mount(self) -> None:
+        list_view = self.query_one("#browser-list", ListView)
+        for entry in self._entries:
+            list_view.append(_CardListItem(entry, _entry_summary(entry, self._db.get(entry.key))))
+        if self._entries:
+            list_view.index = self._initial if self._initial is not None else 0
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        item = event.item
+        if isinstance(item, _CardListItem):
+            self._show_details(item.entry)
+
+    def _show_details(self, entry: _BrowseCard) -> None:
+        details = self.query_one("#browser-details", Static)
+        card = self._db.get(entry.key)
+        if card is None:
+            details.update(f"[red]Carta fora do registro: {entry.key}[/]")
+            return
+        pos = f"[dim]({entry.idx} · {entry.label})[/]"
+        body = "\n".join(_card_details(entry.key, card))
+        details.update(f"{pos}\n{body}")
+
+
 # ── Aplicação principal ────────────────────────────────────────────────
 
 
@@ -442,8 +556,6 @@ class FaBApp(App[None]):
             "help",
             "plan",
             "read",
-            "rn",
-            "rp",
             "suggest",
             "prob",
             "status",
@@ -481,7 +593,6 @@ class FaBApp(App[None]):
         self._undo_stack = []
         self._replay_index: int = 0
         self._replay_mode: bool = False
-        self._browse_index: _BrowseIndex | None = None
         self.session_log = rec.SessionLog(
             hero_a=matchup.hero_a.name,
             hero_b=matchup.hero_b.name,
@@ -680,8 +791,6 @@ class FaBApp(App[None]):
             "next": self._cmd_next,
             "switch": self._cmd_switch,
             "read": self._cmd_read,
-            "rn": lambda a: self._cmd_read(["next"]),
-            "rp": lambda a: self._cmd_read(["prev"]),
             "plan": self._cmd_plan,
             "suggest": self._cmd_suggest,
             "prob": self._cmd_prob,
@@ -712,8 +821,8 @@ class FaBApp(App[None]):
     def _cmd_help(self, args: list[str]) -> None:
         """Mostra lista de comandos."""
         self._log_notice("[bold underline]Comandos disponíveis:[/]")
-        self._log_notice("  [bold]board[/] [hand|field|a|b]  — lista cartas na mesa/mãos")
-        self._log_notice("  [bold]read[/] [N|nome|next|prev] — detalhes da carta (rn/rp)")
+        self._log_notice("  [bold]board[/] [hand|field|a|b]  — navega cartas em janela modal")
+        self._log_notice("  [bold]read[/] [carta|N]          — detalhes de uma carta (modal)")
         self._log_notice("  [bold]card[/] <carta>            — mostra detalhes da carta")
         self._log_notice("  [bold]draw[/] <carta>           — adiciona carta à mão do ativo")
         self._log_notice("  [bold]pitch[/] <carta>          — dá pitch de uma carta da mão")
@@ -753,18 +862,13 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]reset[/]                   — reinicia a partida do zero")
         self._log_notice("  [bold]help[/]                    — esta mensagem")
 
-    def _cmd_board(self, args: list[str]) -> None:
-        """board [filtro] — lista todas as cartas na mesa e mãos com índices.
-
-        Filtros: hand, field, a, b (combináveis).
-        Exemplos: board, board hand, board a, board field b
-        """
+    def _open_board_modal(self, args: list[str]) -> None:
+        """Abre o modal do board com filtros opcionais (hand/field/a/b)."""
         all_cards = _collect_board_cards(self.game_state, self.cards)
         if not all_cards:
             self._log_notice("Nenhuma carta na mesa ou nas mãos.")
             return
 
-        # Parse filtros
         filtros = {a.lower() for a in args}
         hand_only = "hand" in filtros
         field_only = "field" in filtros
@@ -786,104 +890,48 @@ class FaBApp(App[None]):
             self._log_notice("Nenhuma carta corresponde ao filtro.")
             return
 
-        # Agrupar por seção
-        sections: dict[str, list[_BrowseCard]] = {}
-        for bc in filtered:
-            if bc.location in ("weapon", "equipment"):
-                sec = f"Mesa ({bc.side})"
-            elif bc.location == "aura":
-                sec = f"Auras ({bc.side})"
-            elif bc.location == "hand":
-                sec = f"Mão ({bc.side})"
-            elif bc.location == "arsenal":
-                sec = f"Arsenal ({bc.side})"
-            else:
-                sec = bc.location
-            sections.setdefault(sec, []).append(bc)
+        self.push_screen(
+            CardBrowser(filtered, self.cards, title=f"Board — {len(filtered)} carta(s)")
+        )
 
-        self._log_notice("[bold]Board:[/]")
-        for sec_name, sec_cards in sections.items():
-            self._log_notice(f"  [dim]{sec_name}:[/]")
-            for bc in sec_cards:
-                card = self.cards.get(bc.key)
-                if card is None:
-                    self._log_notice(f"    [{bc.idx}] [red]{bc.key}[/] [dim](?)[/]")
-                    continue
-                parts: list[str] = [f"[bold]{bc.key}[/]"]
-                if card.power is not None:
-                    parts.append(f"{card.power}{{p}}")
-                if card.defense is not None:
-                    parts.append(f"{card.defense}{{d}}")
-                if card.cost:
-                    parts.append(f"{card.cost}{{r}}")
-                if card.keywords:
-                    parts.append(", ".join(card.keywords))
-                self._log_notice(f"    [{bc.idx}] {' — '.join(parts)}")
+    def _cmd_board(self, args: list[str]) -> None:
+        """board [filtro] — abre janela modal com cartas na mesa e mãos.
 
-        # Salvar índice para navegação
-        self._browse_index = _BrowseIndex(filtered)
+        Filtros: hand, field, a, b (combináveis).
+        Exemplos: board hand, board a, board field b
+        """
+        self._open_board_modal(args)
 
     def _cmd_read(self, args: list[str]) -> None:
-        """read [N|nome|next|prev] — mostra detalhes de uma carta.
+        """read [carta|N] — abre detalhes de uma carta em janela modal.
 
-        read 4       — carta #4 do último board
-        read snatch  — busca por nome
-        read next    — próxima carta (rn)
-        read prev    — carta anterior (rp)
-        read         — repete último read
+        read            — abre o board completo em modal
+        read <carta>    — busca por nome no registro e abre detalhes
+        read <N>        — carta N da mão do jogador ativo
         """
-        if not self._browse_index and not args:
-            raise ValueError("Navegue com 'board' primeiro, ou use 'read <N>'")
-        if not self._browse_index:
-            raise ValueError("Navegue com 'board' primeiro.")
-
-        texto = " ".join(args).lower() if args else ""
-
-        if texto in ("next", "n", "proxima", "próxima"):
-            bc = self._browse_index.next()
-            if bc is None:
-                self._log_notice("Já está na última carta.")
-                return
-        elif texto in ("prev", "p", "anterior"):
-            bc = self._browse_index.prev()
-            if bc is None:
-                self._log_notice("Já está na primeira carta.")
-                return
-        elif texto.isdigit():
-            num = int(texto)
-            for card in self._browse_index.cards:
-                if card.idx == num:
-                    self._browse_index.current = self._browse_index.cards.index(card)
-                    bc = card
-                    break
-            else:
-                raise ValueError(f"Índice {num} não encontrado no board.")
-        elif texto:
-            # Busca por nome
-            found = None
-            for card in self._browse_index.cards:
-                if texto in card.key.lower():
-                    found = card
-                    break
-            if found is None:
-                raise ValueError(f"Carta '{texto}' não encontrada no board.")
-            self._browse_index.current = self._browse_index.cards.index(found)
-            bc = found
-        else:
-            # Repete último
-            bc = self._browse_index.get()
-            if bc is None:
-                raise ValueError("Nenhuma carta selecionada.")
-
-        card = self.cards.get(bc.key)
-        if card is None:
-            self._log_notice(f"[red]Carta fora do registro: {bc.key}[/]")
+        if not args:
+            self._open_board_modal([])
             return
 
-        pos = f"{self._browse_index.current + 1}/{self._browse_index.total}"
-        self._log_notice(f"[dim]({pos})[/]")
-        for line in _card_details(bc.key, card):
-            self._log_notice(line)
+        texto = " ".join(args)
+        side = self.game_state.active_player
+        key: str | None = None
+        if texto.isdigit():
+            p = self.game_state.players[side]
+            idx = int(texto) - 1
+            if 0 <= idx < len(p.hand):
+                key = p.hand[idx]
+            else:
+                raise ValueError(f"Índice {texto} fora da mão (1-{len(p.hand)})")
+        else:
+            key = _find_card(texto, self.cards)
+        if key is None:
+            raise ValueError(f"Carta não encontrada: '{texto}'")
+        if key not in self.cards:
+            raise ValueError(f"Carta fora do registro: {key}")
+
+        entry = _BrowseCard(1, key, side, "read", "Carta")
+        self.push_screen(CardBrowser([entry], self.cards, title=key))
 
     def _cmd_card(self, args: list[str]) -> None:
         """card <carta|número> — mostra todos os detalhes de uma carta.
