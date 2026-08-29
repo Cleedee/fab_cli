@@ -153,8 +153,9 @@ Armas e cartas com `"Action"` no tipo contam para o limite do Dominate
 | Comando | Descrição |
 |---|---|
 | `resolve [ward=N] [arcane=N]` | Resolve o chain link ativo. Opcionalmente informa quanto dano foi prevenido por Ward ou Arcane Barrier |
+| `life <±N> [a\|b]` | Ajusta vida manualmente fora de combate (negativo tira, positivo soma). Lado opcional, default o ativo |
 
-Exemplo: `resolve ward=3 arcane=2`
+Exemplo: `resolve ward=3 arcane=2` · `life -4` (tira 4 do ativo) · `life b +2` (soma 2 ao lado B)
 
 #### Turno
 

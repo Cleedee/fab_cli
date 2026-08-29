@@ -222,6 +222,27 @@ def use_item_token(state: GameState, side: str, name: str, cards: dict[str, Card
     return Notice(f"{name} ativado: -{cost}{{r}}, compre 1 carta")
 
 
+# ---------------------------------------------------------------------------
+# Vida (ajuste manual)
+# ---------------------------------------------------------------------------
+
+
+def adjust_life(state: GameState, side: str, delta: int) -> Notice:
+    """Ajusta a vida do lado indicado; delta negativo tira, positivo soma.
+
+    Uso manual para eventos fora do combate (efeitos especiais, erro de
+    trigger, setup). O `resolve` de combat.py já aplica dano automaticamente.
+    """
+    if side not in state.players:
+        raise CombatError(f"lado inválido: {side} (use A ou B)")
+    if delta == 0:
+        raise CombatError("delta de vida deve ser diferente de zero")
+    p = state.players[side]
+    p.life += delta
+    sinal = "+" if delta > 0 else ""
+    return Notice(f"{side}: vida {p.life} ({sinal}{delta})")
+
+
 def has_aura(player: PlayerState, name: str) -> bool:
     """Verifica se o jogador controla ao menos 1 cópia da aura."""
     return bool(player.auras.get(name))

@@ -785,6 +785,7 @@ class FaBApp(App[None]):
             "weapon": self._cmd_weapon,
             "boost": self._cmd_boost,
             "arcane": self._cmd_arcane,
+            "life": self._cmd_life,
             "defend": self._cmd_defend,
             "equip": self._cmd_equip,
             "resolve": self._cmd_resolve,
@@ -836,6 +837,7 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]weapon[/] [1|2]            — ataca com a arma (índice)")
         self._log_notice("  [bold]boost[/] <N>               — +N{p} no link atual")
         self._log_notice("  [bold]arcane[/] <N>              — +N arcano no link atual")
+        self._log_notice("  [bold]life[/] <±N> [a|b]          — ajusta vida (ex.: life -4)")
         self._log_notice("  [bold]defend[/] [auto|N|suggest] — bloqueia link oponente")
         self._log_notice("  [bold]equip[/] <equip>           — usa equipamento p/ defesa")
         self._log_notice("  [bold]resolve[/] [ward=N] [arcane=N] — resolve link")
@@ -1017,6 +1019,31 @@ class FaBApp(App[None]):
         )
         self._log_notice(f"🎯 {notice.text}")
         self._record("use", notice.text)
+
+    def _cmd_life(self, args: list[str]) -> None:
+        """life <±N> [a|b] — ajusta a vida de um jogador manualmente.
+
+        Delta com sinal: negativo tira, positivo soma. Lado opcional
+        (a/b), default o jogador ativo. Ex.: life -4, life B +2.
+        """
+        if not args:
+            raise ValueError("uso: life <±N> [a|b] (ex.: life -4, life b +2)")
+        delta_arg: str | None = None
+        side_arg: str | None = None
+        delta_args = [a for a in args if a.lower() not in ("a", "b")]
+        side_args = [a for a in args if a.lower() in ("a", "b")]
+        if len(delta_args) != 1 or len(side_args) > 1:
+            raise ValueError("uso: life <±N> [a|b] (ex.: life -4, life b +2)")
+        delta_arg = delta_args[0]
+        side_arg = side_args[0] if side_args else None
+        raw = delta_arg[1:] if delta_arg[:1] in "+-" else delta_arg
+        if not raw.isdigit():
+            raise ValueError(f"delta inválido: '{delta_arg}' (use ex.: -4, +2)")
+        delta = int(delta_arg)
+        side = side_arg.upper() if side_arg else self.game_state.active_player
+        notice = cmb.adjust_life(self.game_state, side, delta)
+        self._log_notice(f"❤️ {notice.text}")
+        self._record("life", notice.text)
 
     def _cmd_arsenal(self, args: list[str]) -> None:
         """arsenal <carta> — coloca no arsenal."""
