@@ -187,36 +187,49 @@ ITEM_TOKEN_COSTS: dict[str, int] = {
 }
 
 
-def create_token(state: GameState, side: str, name: str, qty: int = 1) -> Notice:
-    """Cria token. Aura vai para auras; item vai para tokens."""
+def create_token(
+    state: GameState,
+    side: str,
+    name: str,
+    qty: int = 1,
+    cards: dict[str, Card] | None = None,
+) -> Notice:
+    """Cria token/aura/permanente pelo nome.
+
+    - item (Gold/Silver/Copper) → tokens;
+    - carta real com tipo permanente (Ally/Item/Landmark) → permanentes;
+    - senão → aura.
+    """
     card = state.players[side]
-    # Verificar se é aura ou item no carddb (lookup externo via cards)
-    # Por simplicidade: auras são tipos que contêm "Aura", itens contêm "Item"
-    # O caller pode forçar tipo via is_item parameter
-    is_item = name in ITEM_TOKEN_COSTS
-    if is_item:
+    if name in ITEM_TOKEN_COSTS:
         card.add_token(name, qty)
         return Notice(f"+{qty} {name} (item)")
-    else:
-        for _ in range(qty):
-            card.add_aura(name)
-        return Notice(f"+{qty} {name} (aura)")
+    if cards is not None:
+        real = cards.get(name)
+        if real is not None and real.is_permanent:
+            for _ in range(qty):
+                card.add_permanent(name)
+            return Notice(f"+{qty} {name} (permanente)")
+    for _ in range(qty):
+        card.add_aura(name)
+    return Notice(f"+{qty} {name} (aura)")
 
 
 def remove_token(state: GameState, side: str, name: str, qty: int = 1) -> Notice:
-    """Remove token. Aura remove cópia; item remove quantidade."""
+    """Remove token/aura/permanente. Procura nas três zonas."""
     p = state.players[side]
-    is_item = name in ITEM_TOKEN_COSTS
-    if is_item:
+    if name in ITEM_TOKEN_COSTS:
         remaining = p.pop_token(name, qty)
         removed = qty - remaining if remaining < qty else 0
         return Notice(f"-{removed} {name} (restam {remaining})")
-    else:
-        removed = 0
-        for _ in range(qty):
-            if p.pop_aura(name) is not None:
-                removed += 1
-        return Notice(f"-{removed} {name}")
+    removed = 0
+    for _ in range(qty):
+        if p.pop_aura(name) is not None:
+            removed += 1
+    for _ in range(qty):
+        if p.pop_permanent(name) is not None:
+            removed += 1
+    return Notice(f"-{removed} {name}")
 
 
 def use_item_token(state: GameState, side: str, name: str, cards: dict[str, Card]) -> Notice:
@@ -335,6 +348,9 @@ def play_action(
         notices.append(Notice(f"{card.name} jogada do cemitério (watery grave)."))
     else:
         _move_card(p.hand, card_key)
+    if card.is_permanent:
+        p.add_permanent(card_key)
+        notices.append(Notice(f"{card.name} fica em jogo (permanente)."))
     p.cards_played_this_turn.append(card_key)
     p.non_attack_actions_played += 1
 

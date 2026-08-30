@@ -246,6 +246,14 @@ def _collect_board_cards(state: GameState, cards: dict[str, Card]) -> list[_Brow
                 label = f"Aura {side}" + (f" [{cnt}]" if cnt else "")
                 result.append(_BrowseCard(idx, key, side, "aura", label))
 
+        for key, copies in p.permanents.items():
+            for i, cnt in enumerate(copies):
+                idx += 1
+                c = cards.get(key)
+                sub = "Ally" if c and c.is_ally else "Item" if c and c.is_item else "Perm"
+                label = f"{sub} {side}" + (f" [{cnt}]" if cnt else "")
+                result.append(_BrowseCard(idx, key, side, "permanent", label))
+
         for name, qty in p.tokens.items():
             idx += 1
             result.append(_BrowseCard(idx, name, side, "token", f"Token {side} x{qty}"))
@@ -285,6 +293,7 @@ class PlayerPanel(Vertical):
         yield Static(id=f"weapon-{self.side}")
         yield Static(id=f"hand-{self.side}")
         yield Static(id=f"arsenal-{self.side}")
+        yield Static(id=f"perms-{self.side}")
         yield Static(id=f"auras-{self.side}")
         yield Static(id=f"equip-{self.side}")
 
@@ -365,6 +374,17 @@ class PlayerPanel(Vertical):
             aura_lines.append(" (nenhum)")
         self.query_one(f"#auras-{self.side}", Static).update(
             "[bold]Auras/Tokens:[/]\n" + "\n".join(aura_lines)
+        )
+
+        # Permanentes (Ally/Item/Landmark) em jogo
+        perm_lines = []
+        for key, copies in p.permanents.items():
+            for i, cnt in enumerate(copies):
+                perm_lines.append(f"  {key}" + (f" (+{cnt})" if cnt else ""))
+        if not perm_lines:
+            perm_lines.append(" (nenhum)")
+        self.query_one(f"#perms-{self.side}", Static).update(
+            "[bold]Permanentes:[/]\n" + "\n".join(perm_lines)
         )
 
         # Equipamentos (exclui Off-Hand, que é exibido na zona de armas)
@@ -847,7 +867,7 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]pitch[/] <carta>          — dá pitch de uma carta da mão")
         self._log_notice("  [bold]discard[/] <carta>        — descarta carta da mão")
         self._log_notice("  [bold]arsenal[/] <carta>        — coloca carta no arsenal")
-        self._log_notice("  [bold]token[/] <nome> [qtd]     — cria token (aura ou item)")
+        self._log_notice("  [bold]token[/] <nome> [qtd]     — cria token/aura/permanente")
         self._log_notice("  [bold]token remove[/] <nome>    — remove token")
         self._log_notice("  [bold]use[/] <token>             — ativa item (Gold/Silver/Copper)")
         self._log_notice("  [bold]play[/] <carta> [from=graveyard] — joga non-attack action")
@@ -1019,11 +1039,15 @@ class FaBApp(App[None]):
                 raise ValueError("uso: token remove <nome> [qtd]")
             name = " ".join(args[1:-1]) if args[-1].isdigit() else " ".join(args[1:])
             qty = int(args[-1]) if args[-1].isdigit() else 1
+            name = self._resolve_permanent_name(name)
             notice = cmb.remove_token(self.game_state, self.game_state.active_player, name, qty)
         else:
             name = " ".join(args[:-1]) if args[-1].isdigit() else " ".join(args)
             qty = int(args[-1]) if args[-1].isdigit() else 1
-            notice = cmb.create_token(self.game_state, self.game_state.active_player, name, qty)
+            name = self._resolve_permanent_name(name)
+            notice = cmb.create_token(
+                self.game_state, self.game_state.active_player, name, qty, self.cards
+            )
         self._log_notice(f"🎯 {notice.text}")
         self._record("token", notice.text)
 
@@ -1444,6 +1468,7 @@ class FaBApp(App[None]):
             self._log_notice(f"  Mão ({len(p.hand)}): {p.hand}")
             self._log_notice(f"  Arsenal: {p.arsenal}")
             self._log_notice(f"  Auras: {dict(p.auras)}")
+            self._log_notice(f"  Permanentes: {dict(p.permanents)}")
             self._log_notice(f"  Tokens: {dict(p.tokens)}")
             self._log_notice(f"  Graveyard: {p.graveyard}")
             self._log_notice(f"  Banished: {p.banished}")
@@ -1684,6 +1709,17 @@ class FaBApp(App[None]):
         if key is None:
             raise ValueError(f"Carta não encontrada: '{text}'")
         return key
+
+    def _resolve_permanent_name(self, name: str) -> str:
+        """Resolve nome parcial de permanente (ex.: "Riggermortis" → "Riggermortis (yellow)").
+
+        Se o texto não corresponder a uma carta permanente, devolve o nome
+        original (mantém o fluxo de tokens/auras).
+        """
+        key = _find_card(name, self.cards)
+        if key is not None and self.cards[key].is_permanent:
+            return key
+        return name
 
 
 # ── Ponto de entrada ────────────────────────────────────────────────────

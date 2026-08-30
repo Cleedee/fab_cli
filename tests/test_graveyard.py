@@ -10,6 +10,7 @@ from flesh_and_blood.combat import (
     discard,
     may_play_from_graveyard,
     play_action,
+    remove_token,
     start_turn,
 )
 from flesh_and_blood.models import Hero, new_game
@@ -175,3 +176,60 @@ def test_parse_source_grave_abreviado():
 def test_parse_source_invalido():
     with pytest.raises(ValueError, match="origem inválida"):
         _parse_grave_source(["from=banished"])
+
+
+# --- Permanentes (Ally/Item/Landmark ficam em jogo) ---
+
+
+def test_riggermortis_eh_permanente(cards):
+    c = cards["Riggermortis (yellow)"]
+    assert c.is_ally
+    assert not c.is_attack
+    assert c.is_permanent
+
+
+def test_play_permanente_fica_em_jogo(state, cards):
+    p = state.players["A"]
+    p.hand.append("Riggermortis (yellow)")
+    p.pitch_pool = 1
+    notices = play_action(state, "A", "Riggermortis (yellow)", cards)
+    assert any("permanente" in n.text for n in notices)
+    assert "Riggermortis (yellow)" not in p.hand
+    assert "Riggermortis (yellow)" in p.permanents
+
+
+def test_play_permanente_do_cemiterio_fica_em_jogo(state, cards):
+    _enable(state, cards)
+    p = state.players["A"]
+    p.graveyard.append("Riggermortis (yellow)")
+    p.pitch_pool = 1
+    play_action(state, "A", "Riggermortis (yellow)", cards, source="graveyard")
+    assert "Riggermortis (yellow)" not in p.graveyard
+    assert "Riggermortis (yellow)" in p.permanents
+
+
+def test_permanente_aparece_no_board_browse(state, cards):
+    from flesh_and_blood.app import _collect_board_cards
+
+    p = state.players["A"]
+    p.add_permanent("Riggermortis (yellow)")
+    result = _collect_board_cards(state, cards)
+    perms = [c for c in result if c.location == "permanent"]
+    assert len(perms) == 1
+    assert perms[0].key == "Riggermortis (yellow)"
+    assert perms[0].side == "A"
+
+
+def test_create_token_permanente(state, cards):
+    from flesh_and_blood.combat import create_token
+
+    notice = create_token(state, "A", "Riggermortis (yellow)", cards=cards)
+    assert "permanente" in notice.text
+    assert "Riggermortis (yellow)" in state.players["A"].permanents
+
+
+def test_remove_token_permanente(state, cards):
+    state.players["A"].add_permanent("Riggermortis (yellow)")
+    notice = remove_token(state, "A", "Riggermortis (yellow)")
+    assert "Riggermortis (yellow)" in notice.text
+    assert "Riggermortis (yellow)" not in state.players["A"].permanents

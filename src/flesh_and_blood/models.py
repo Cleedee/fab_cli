@@ -56,6 +56,19 @@ class Card:
         return "Equipment" in self.types
 
     @property
+    def is_ally(self) -> bool:
+        return "Ally" in self.types
+
+    @property
+    def is_item(self) -> bool:
+        return "Item" in self.types
+
+    @property
+    def is_permanent(self) -> bool:
+        """Permanente: fica em jogo (arena) depois de jogada (Ally/Item/Landmark)."""
+        return "Ally" in self.types or "Item" in self.types or "Landmark" in self.types
+
+    @property
     def equipment_slot(self) -> str | None:
         """Slot do equipamento: Head, Chest, Arms, Legs ou Off-Hand. None se não tem slot."""
         for slot in ("Head", "Chest", "Arms", "Legs"):
@@ -101,6 +114,8 @@ class PlayerState:
     action_points: int = 1
     # auras em jogo: chave da carta -> lista de contadores +1 por cópia
     auras: dict[str, list[int]] = field(default_factory=dict)
+    # permanentes em jogo (Ally/Item/Landmark): chave -> contadores por cópia
+    permanents: dict[str, list[int]] = field(default_factory=dict)
     # equipamentos usáveis: chave -> durabilidade restante (None = destrói-se só por efeito)
     equipment_uses: dict[str, int | None] = field(default_factory=dict)
     equipment_destroyed: list[str] = field(default_factory=list)
@@ -145,6 +160,23 @@ class PlayerState:
         counters = copies.pop(index)
         if not copies:
             del self.auras[card_key]
+        return counters
+
+    def add_permanent(self, card_key: str, counters: int = 0) -> int:
+        """Coloca uma permanente em jogo; retorna o índice da cópia."""
+        self.permanents.setdefault(card_key, []).append(counters)
+        return len(self.permanents[card_key]) - 1
+
+    def pop_permanent(self, card_key: str, index: int | None = None) -> int | None:
+        """Remove uma cópia da permanente (destruída); retorna os contadores dela (ou None)."""
+        copies = self.permanents.get(card_key)
+        if not copies:
+            return None
+        if index is None:
+            index = len(copies) - 1
+        counters = copies.pop(index)
+        if not copies:
+            del self.permanents[card_key]
         return counters
 
     def add_token(self, name: str, qty: int = 1) -> int:

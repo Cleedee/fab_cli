@@ -108,6 +108,9 @@ Scripts auxiliares:
   `blue_to_graveyard_this_turn` (reset no `start_turn`); `play`/`attack` aceitam
   `from=graveyard` validando a passiva (herói Gravy Bones + blue no turno +
   carta com watery grave — detectado no texto, pois o dataset não tem keyword).
+- Permanentes (Ally/Item/Landmark): `play`/`token` colocam a carta em
+  `permanents` (zona própria no painel/board/status — não some da mesa);
+  `token remove` destrói. Nomes resolvem por parcial (`play "Riggermortis"`).
 - Comando `life <±N> [a|b]`: ajuste manual de vida fora de combate.
 
 ## Status
