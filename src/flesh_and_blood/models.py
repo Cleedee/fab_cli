@@ -69,6 +69,11 @@ class Card:
     def is_hero(self) -> bool:
         return "Hero" in self.types
 
+    @property
+    def is_watery_grave(self) -> bool:
+        """Carta com a mecânica watery grave (presente no texto da carta)."""
+        return "watery grave" in self.text.lower()
+
 
 @dataclass(frozen=True)
 class Hero:
@@ -114,6 +119,9 @@ class PlayerState:
     weapon_attacks_this_turn: list[str] = field(default_factory=list)
     first_attack_damage_done: bool = False
     cards_played_this_turn: list[str] = field(default_factory=list)
+    # Gravy Bones: um card blue entrando no cemitério neste turno habilita
+    # jogar cartas com watery grave de lá (resetado em start_turn).
+    blue_to_graveyard_this_turn: int = 0
 
     def damage(self, amount: int) -> int:
         self.life -= amount

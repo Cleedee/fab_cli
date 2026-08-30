@@ -138,6 +138,11 @@ número na lista da mão (`1`, `2`, etc.).
 
 Para ataques com Dominate: `attack Snatch dominate=1`
 
+Opcional `from=graveyard` em `play`/`attack` joga a carta do cemitério — a passiva
+do **Gravy Bones** (card blue entrando no cemitério neste turno habilita jogar
+cards com *watery grave* de lá) é validada automaticamente.
+Exemplo: `play "Angry Bones (blue)" from=graveyard`
+
 #### Defesa
 
 | Comando | Descrição |

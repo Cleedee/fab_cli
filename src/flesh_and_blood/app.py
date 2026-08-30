@@ -115,6 +115,24 @@ def _find_card(partial: str, cards: dict[str, Card]) -> str | None:
     return None
 
 
+def _parse_grave_source(args: list[str]) -> tuple[str, list[str]]:
+    """Separa `from=graveyard` dos demais argumentos de play/attack.
+
+    Retorna (origem, restante). Aceita from=graveyard ou from=grave; default hand.
+    """
+    source = "hand"
+    rest: list[str] = []
+    for a in args:
+        if a.lower().startswith("from="):
+            src = a.lower().split("=", 1)[1]
+            if src not in ("hand", "grave", "graveyard"):
+                raise ValueError(f"origem inválida: '{a}'")
+            source = "graveyard" if src == "grave" else src
+        else:
+            rest.append(a)
+    return source, rest
+
+
 def _card_details(key: str, card: Card) -> list[str]:
     """Linhas com todos os detalhes de uma carta (para o log de notícias)."""
     lines: list[str] = []
@@ -832,8 +850,8 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]token[/] <nome> [qtd]     — cria token (aura ou item)")
         self._log_notice("  [bold]token remove[/] <nome>    — remove token")
         self._log_notice("  [bold]use[/] <token>             — ativa item (Gold/Silver/Copper)")
-        self._log_notice("  [bold]play[/] <carta>           — joga non-attack action")
-        self._log_notice("  [bold]attack[/] <carta>         — declara ataque [dominate=...]")
+        self._log_notice("  [bold]play[/] <carta> [from=graveyard] — joga non-attack action")
+        self._log_notice("  [bold]attack[/] <carta> [dominate=1] [from=graveyard] — ataca")
         self._log_notice("  [bold]weapon[/] [1|2]            — ataca com a arma (índice)")
         self._log_notice("  [bold]boost[/] <N>               — +N{p} no link atual")
         self._log_notice("  [bold]arcane[/] <N>              — +N arcano no link atual")
@@ -988,7 +1006,7 @@ class FaBApp(App[None]):
         if not args:
             raise ValueError("uso: discard <carta>")
         key = self._resolve_card(" ".join(args))
-        cmb.discard(self.game_state, self.game_state.active_player, key)
+        cmb.discard(self.game_state, self.game_state.active_player, key, self.cards)
         self._log_notice(f"{key} descartada.")
         self._record("discard", f"{key} → cemitério")
 
@@ -1055,24 +1073,30 @@ class FaBApp(App[None]):
         self._record("arsenal", f"{key} → arsenal")
 
     def _cmd_play(self, args: list[str]) -> None:
-        """play <carta> — joga non-attack action."""
-        if not args:
-            raise ValueError("uso: play <carta>")
-        key = self._resolve_card(" ".join(args))
-        notices = cmb.play_action(self.game_state, self.game_state.active_player, key, self.cards)
+        """play <carta> [from=graveyard] — joga non-attack action."""
+        source, card_args = _parse_grave_source(args)
+        if not card_args:
+            raise ValueError("uso: play <carta> [from=graveyard]")
+        key = self._resolve_card(" ".join(card_args))
+        notices = cmb.play_action(
+            self.game_state, self.game_state.active_player, key, self.cards, source=source
+        )
         for n in notices:
             self._log_notice(f"⚡ {n.text}")
-        self._record("play", f"Jogou {key}", result=[n.text for n in notices])
+        self._record("play", f"Jogou {key} ({source})", result=[n.text for n in notices])
 
     def _cmd_attack(self, args: list[str]) -> None:
-        """attack <carta> [dominate=1] — declara ataque."""
+        """attack <carta> [dominate=1] [from=graveyard] — declara ataque."""
         if not args:
-            raise ValueError("uso: attack <carta> [dominate=1]")
+            raise ValueError("uso: attack <carta> [dominate=1] [from=graveyard]")
         dominate = False
         card_args = [a for a in args if "dominate" not in a.lower()]
         for a in args:
             if "dominate" in a.lower():
                 dominate = True
+        source, card_args = _parse_grave_source(card_args)
+        if not card_args:
+            raise ValueError("uso: attack <carta> [dominate=1] [from=graveyard]")
         key = self._resolve_card(" ".join(card_args))
         link = cmb.declare_attack(
             self.game_state,
@@ -1080,12 +1104,15 @@ class FaBApp(App[None]):
             key,
             self.cards,
             dominate=dominate,
+            source=source,
         )
         dom_str = " [yellow]Dominate[/]" if dominate else ""
         self._log_notice(f"⚔ Ataque declarado: {key} ({link.total_damage}{{p}}){dom_str}")
+        if source == "graveyard":
+            self._log_notice("[dim]Ataque do cemitério (watery grave).[/]")
         self._record(
             "attack",
-            f"{key} ({link.total_damage}{{p}}){dom_str}",
+            f"{key} ({link.total_damage}{{p}}){dom_str} ({source})",
         )
 
     def _cmd_weapon(self, args: list[str]) -> None:

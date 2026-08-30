@@ -9,11 +9,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import Card, ChainLink, GameState, PlayerState
+from .models import Card, ChainLink, Color, GameState, PlayerState
 
 EMBODIMENT_EARTH = "Embodiment of Earth"
 EMBODIMENT_LIGHTNING = "Embodiment of Lightning"
 SPECTRAL_SHIELD = "Spectral Shield"
+
+# Heróis com a passiva watery grave (jogar cartas do cemitério).
+GRAVY_BONES_HEROES: frozenset[str] = frozenset({"Gravy Bones", "Gravy Bones, Shipwrecked Looter"})
 
 
 class CombatError(Exception):
@@ -46,6 +49,7 @@ def start_turn(state: GameState, side: str) -> list[Notice]:
     p.weapon_attacks_this_turn.clear()
     p.first_attack_damage_done = False
     p.cards_played_this_turn.clear()
+    p.blue_to_graveyard_this_turn = 0
 
     # Embodiment of Earth é destruído no início da sua action phase.
     while p.auras.get(EMBODIMENT_EARTH):
@@ -136,11 +140,21 @@ def place_arsenal(state: GameState, side: str, card_key: str) -> None:
     p.arsenal = card_key
 
 
-def discard(state: GameState, side: str, card_key: str) -> None:
-    """Descarta uma carta da mão para o cemitério."""
+def discard(
+    state: GameState, side: str, card_key: str, cards: dict[str, Card] | None = None
+) -> None:
+    """Descarta uma carta da mão para o cemitério.
+
+    Um card blue entrando no cemitério neste turno alimenta a condição do
+    Gravy Bones (jogar cards watery grave do cemitério).
+    """
     p = state.players[side]
     _move_card(p.hand, card_key)
     p.graveyard.append(card_key)
+    if cards is not None:
+        card = cards.get(card_key)
+        if card is not None and card.color == Color.BLUE:
+            p.blue_to_graveyard_this_turn += 1
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +272,22 @@ def count_auras(player: PlayerState, name: str) -> int:
 # ---------------------------------------------------------------------------
 
 
+def may_play_from_graveyard(state: GameState, side: str) -> bool:
+    """Passiva do Gravy Bones: jogar do cemitério se um blue entrou nele no turno."""
+    p = state.players[side]
+    return p.hero_key in GRAVY_BONES_HEROES and p.blue_to_graveyard_this_turn > 0
+
+
+def _check_graveyard_play(state: GameState, side: str, card: Card) -> None:
+    """Valida a passiva watery grave do Gravy Bones para jogar do cemitério."""
+    if not may_play_from_graveyard(state, side):
+        raise CombatError(
+            "Gravy Bones: exige um card blue no cemitério neste turno para jogar de lá"
+        )
+    if not card.is_watery_grave:
+        raise CombatError(f"{card.name} não tem watery grave")
+
+
 def play_action(
     state: GameState,
     side: str,
@@ -265,12 +295,14 @@ def play_action(
     cards: dict[str, Card],
     *,
     go_again_earned: bool | None = None,
+    source: str = "hand",
 ) -> list[Notice]:
-    """Joga uma non-attack action da mão (Defense Reaction não passa por aqui).
+    """Joga uma non-attack action da mão ou do cemitério (watery grave).
 
     go_again_earned: None = deduz das keywords da carta; passe False quando o
     Go Again for condicional e não satisfeito, True quando concedido por outro
     efeito.
+    source: "hand" (default) ou "graveyard" (passiva do Gravy Bones).
     """
     notices: list[Notice] = []
     p = state.players[side]
@@ -279,8 +311,15 @@ def play_action(
         raise CombatError("Defense Reaction é jogada durante a defesa")
     if not card.is_non_attack_action:
         raise CombatError(f"{card.name} não é uma non-attack action")
-    if card_key not in p.hand:
-        raise CombatError(f"{card.name} não está na mão")
+    if source not in ("hand", "graveyard"):
+        raise CombatError(f"origem inválida: {source} (use hand ou graveyard)")
+    if source == "hand":
+        if card_key not in p.hand:
+            raise CombatError(f"{card.name} não está na mão")
+    else:
+        if card_key not in p.graveyard:
+            raise CombatError(f"{card.name} não está no cemitério")
+        _check_graveyard_play(state, side, card)
 
     cost = card.cost or 0
     if p.pitch_pool < cost:
@@ -291,7 +330,11 @@ def play_action(
     _use_ap(p, earned)
 
     p.pitch_pool -= cost
-    _move_card(p.hand, card_key)
+    if source == "graveyard":
+        p.graveyard.remove(card_key)
+        notices.append(Notice(f"{card.name} jogada do cemitério (watery grave)."))
+    else:
+        _move_card(p.hand, card_key)
     p.cards_played_this_turn.append(card_key)
     p.non_attack_actions_played += 1
 
@@ -325,20 +368,25 @@ def declare_attack(
     go_again_earned: bool | None = None,
     power_counters: int = 0,
     dominate: bool = False,
+    source: str = "hand",
 ) -> ChainLink:
     """Declara um ataque e cria um chain link.
 
-    - Attack action: paga o custo, sai da mão/arsenal e consome 1 AP (devolvido
+    - Attack action: paga o custo, sai da mão/arsenal (ou do cemitério, via
+      source="graveyard" — passiva watery grave) e consome 1 AP (devolvido
       se ganhar Go Again). Embodiment of Lightning é consumido automaticamente
       para conceder Go Again à próxima attack action.
     - Arma (is_weapon): uma vez por turno; custo em recursos via resource_cost
       (ex.: Star Fall custa 1, ou 0 se Blossom of Spring foi destruída).
+      Armas nunca saem do cemitério.
     - power_counters: contadores +1{p} já existentes no atacante.
     """
     p = state.players[side]
     card = _require(cards, card_key)
 
     if is_weapon:
+        if source != "hand":
+            raise CombatError("armas não são jogadas do cemitério")
         if not card.is_weapon:
             raise CombatError(f"{card.name} não é uma arma")
         if card_key in p.weapon_attacks_this_turn:
@@ -356,8 +404,13 @@ def declare_attack(
     else:
         if not card.is_attack:
             raise CombatError(f"{card.name} não é uma attack action")
+        from_graveyard = source == "graveyard"
         from_arsenal = card_key == p.arsenal
-        if card_key not in p.hand and not from_arsenal:
+        if from_graveyard:
+            if card_key not in p.graveyard:
+                raise CombatError(f"{card.name} não está no cemitério")
+            _check_graveyard_play(state, side, card)
+        elif card_key not in p.hand and not from_arsenal:
             raise CombatError(f"{card.name} não está na mão nem no arsenal")
 
         # Embodiment of Lightning: a próxima attack action ganha Go Again.
@@ -377,7 +430,9 @@ def declare_attack(
         if p.pitch_pool < cost:
             raise CombatError(f"recursos insuficientes ({p.pitch_pool} < {cost})")
         p.pitch_pool -= cost
-        if from_arsenal:
+        if from_graveyard:
+            p.graveyard.remove(card_key)
+        elif from_arsenal:
             p.arsenal = None
         else:
             _move_card(p.hand, card_key)

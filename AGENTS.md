@@ -104,6 +104,11 @@ Scripts auxiliares:
 - Dano físico é bloqueado por defesa das cartas; **dano arcano não é bloqueável**
   (prevenção manual: Arcane Barrier/spellvoid entram como parâmetro `*_prevented`).
 - Dominate: defensor usa no máximo 2 cartas, sendo no máximo 1 action card.
+- Watery grave (Gravy Bones): `discard` de um card blue no turno seta
+  `blue_to_graveyard_this_turn` (reset no `start_turn`); `play`/`attack` aceitam
+  `from=graveyard` validando a passiva (herói Gravy Bones + blue no turno +
+  carta com watery grave — detectado no texto, pois o dataset não tem keyword).
+- Comando `life <±N> [a|b]`: ajuste manual de vida fora de combate.
 
 ## Status
 
