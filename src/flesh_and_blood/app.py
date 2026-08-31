@@ -240,6 +240,14 @@ def _collect_board_cards(state: GameState, cards: dict[str, Card]) -> list[_Brow
             idx += 1
             result.append(_BrowseCard(idx, p.arsenal, side, "arsenal", f"Arsenal {side}"))
 
+        for key in p.graveyard:
+            idx += 1
+            result.append(_BrowseCard(idx, key, side, "graveyard", f"Cemitério {side}"))
+
+        for key in p.banished:
+            idx += 1
+            result.append(_BrowseCard(idx, key, side, "banished", f"Banidas {side}"))
+
         for key, counters in p.auras.items():
             for i, cnt in enumerate(counters):
                 idx += 1
@@ -860,7 +868,7 @@ class FaBApp(App[None]):
     def _cmd_help(self, args: list[str]) -> None:
         """Mostra lista de comandos."""
         self._log_notice("[bold underline]Comandos disponíveis:[/]")
-        self._log_notice("  [bold]board[/] [hand|field|a|b]  — navega cartas em janela modal")
+        self._log_notice("  [bold]board[/] [hand|field|piles|a|b] — navega cartas em janela modal")
         self._log_notice("  [bold]read[/] [carta|N]          — detalhes de uma carta (modal)")
         self._log_notice("  [bold]card[/] <carta>            — mostra detalhes da carta")
         self._log_notice("  [bold]draw[/] <carta>           — adiciona carta à mão do ativo")
@@ -912,6 +920,7 @@ class FaBApp(App[None]):
         filtros = {a.lower() for a in args}
         hand_only = "hand" in filtros
         field_only = "field" in filtros
+        piles_only = "piles" in filtros
         side_filter: str | None = None
         if "a" in filtros:
             side_filter = "A"
@@ -921,6 +930,8 @@ class FaBApp(App[None]):
         filtered = all_cards
         if hand_only:
             filtered = [c for c in filtered if c.location == "hand"]
+        elif piles_only:
+            filtered = [c for c in filtered if c.location in ("graveyard", "banished")]
         elif field_only:
             filtered = [c for c in filtered if c.location != "hand"]
         if side_filter:
@@ -937,8 +948,9 @@ class FaBApp(App[None]):
     def _cmd_board(self, args: list[str]) -> None:
         """board [filtro] — abre janela modal com cartas na mesa e mãos.
 
-        Filtros: hand, field, a, b (combináveis).
-        Exemplos: board hand, board a, board field b
+        Filtros: hand, field, piles, a, b (combináveis).
+        piles mostra cemitérios + pilhas de banidas.
+        Exemplos: board hand, board piles a, board field b
         """
         self._open_board_modal(args)
 

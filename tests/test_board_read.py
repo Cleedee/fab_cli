@@ -121,3 +121,33 @@ def test_collect_destroyed_equipment_not_shown(cards, game_with_cards):
     result = _collect_board_cards(game_with_cards, cards)
     equip = [c for c in result if c.location == "equipment"]
     assert len(equip) == 0
+
+
+# ── Cemitério e banidas ────────────────────────────────────────────
+
+
+def test_collect_graveyard(cards, empty_game):
+    empty_game.players["A"].graveyard = ["Gleeful Grin (red)", "Sink Below (blue)"]
+    result = _collect_board_cards(empty_game, cards)
+    grave = [c for c in result if c.location == "graveyard"]
+    assert len(grave) == 2
+    assert all(c.side == "A" for c in grave)
+    assert {c.key for c in grave} == {"Gleeful Grin (red)", "Sink Below (blue)"}
+    assert all("Cemitério A" in c.label for c in grave)
+
+
+def test_collect_banished(cards, empty_game):
+    empty_game.players["B"].banished = ["Channel Lake Frigid", "Nimble Strike (yellow)"]
+    result = _collect_board_cards(empty_game, cards)
+    banned = [c for c in result if c.location == "banished"]
+    assert len(banned) == 2
+    assert all(c.side == "B" for c in banned)
+    assert all("Banidas B" in c.label for c in banned)
+
+
+def test_collect_piles_indices_sequential(cards, empty_game):
+    empty_game.players["A"].graveyard = ["Energy Potion (red)"]
+    empty_game.players["B"].banished = ["Nullrune Boots"]
+    result = _collect_board_cards(empty_game, cards)
+    indices = [c.idx for c in result]
+    assert indices == list(range(1, len(result) + 1))
