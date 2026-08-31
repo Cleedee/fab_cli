@@ -349,26 +349,28 @@ def test_play_non_attack_creates_own_chain_link(state, cards):
     assert any("novo elo" in n.text for n in notices)
 
 
-def test_play_non_attack_joins_open_attack_link(state, cards):
+def test_play_non_attack_breaks_open_attack_link(state, cards):
     a = state.players["A"]
     declare_attack(state, "A", "Arcanic Shockwave (red)", cards)
     a.action_points = 1  # Go Again concedido por outro efeito
-    play_action(state, "A", "Sizzle (red)", cards)
-    assert len(state.chain) == 1
-    link = state.chain[0]
-    assert link.total_damage == 4
-    assert link.played == ["Arcanic Shockwave (red)", "Sizzle (red)"]
+    notices = play_action(state, "A", "Sizzle (red)", cards)
+    # A non-attack action quebra a corrente: o ataque vai ao cemitério,
+    # e a non-attack abre um elo próprio.
+    assert any("quebrou a corrente" in n.text for n in notices)
+    assert len(state.chain) == 2
+    assert state.chain[0].resolved
+    assert "Arcanic Shockwave (red)" in a.graveyard
+    new_link = state.chain[1]
+    assert new_link.total_damage == 0
+    assert new_link.played == ["Sizzle (red)"]
 
 
 def test_resolve_moves_played_cards_to_graveyard(state, cards):
     a = state.players["A"]
     declare_attack(state, "A", "Arcanic Shockwave (red)", cards)
-    a.action_points = 1
-    play_action(state, "A", "Sizzle (red)", cards)
     result = resolve_link(state, cards)
     assert result["physical"] == 4
     assert "Arcanic Shockwave (red)" in a.graveyard
-    assert "Sizzle (red)" in a.graveyard
 
 
 def test_resolve_non_attack_link_goes_to_graveyard(state, cards):

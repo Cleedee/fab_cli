@@ -102,9 +102,12 @@ Scripts auxiliares:
 - Action points: toda action (incl. arma, "Once per Turn Action") gasta 1 AP;
   Go Again devolve. Sem AP, não joga — mesmo com Go Again pendente.
 - Corrente/cemitério: toda carta jogada vai à corrente — a attack action cria
-  um elo; uma non-attack action cria elo próprio se a corrente estiver vazia ou
-  entra no elo aberto (não quebra combate). `resolve` move as cartas do elo ao
-  cemitério do atacante; permanentes ficam em jogo e armas permanecem equipadas.
+  um elo; uma non-attack action quebra a corrente de combate em andamento
+  (seus elos abertos fecham: cartas de ataque/defesa vão aos cemitérios,
+  armas/equipamentos permanecem equipados) e abre um elo próprio. `resolve`
+  move as cartas do elo ao cemitério do atacante; permanentes ficam em jogo e
+  armas permanecem equipadas. Cards blue que entram no cemitério ao quebrar a
+  corrente alimentam a passiva watery grave (`_close_combat_chain`).
 - Dano físico é bloqueado por defesa das cartas; **dano arcano não é bloqueável**
   (prevenção manual: Arcane Barrier/spellvoid entram como parâmetro `*_prevented`).
 - Dominate: defensor usa no máximo 2 cartas, sendo no máximo 1 action card.

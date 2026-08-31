@@ -354,17 +354,23 @@ def play_action(
     p.cards_played_this_turn.append(card_key)
     p.non_attack_actions_played += 1
 
-    # Toda carta jogada vai para a corrente. Sem elo aberto, a non-attack
-    # action cria um elo próprio; com combate em andamento, entra no elo atual.
+    # Toda carta jogada vai para a corrente. Jogar uma non-attack action
+    # QUEBRA a corrente de combate em andamento: fecha os elos abertos (cartas
+    # de ataque/defesa vão aos cemitérios) antes de criar um elo próprio.
     open_link = next((l for l in reversed(state.chain) if not l.resolved), None)
-    if open_link is None:
+    if open_link is not None:
+        notices.extend(
+            _close_combat_chain(state, cards, reason="Non-attack action quebrou a corrente")
+        )
         link = ChainLink(attacker=side, card_key=card_key, total_damage=0)
         link.played.append(card_key)
         state.chain.append(link)
         notices.append(Notice(f"{card.name} vai para a corrente (novo elo da corrente)."))
     else:
-        open_link.played.append(card_key)
-        notices.append(Notice(f"{card.name} entra no elo atual da corrente."))
+        link = ChainLink(attacker=side, card_key=card_key, total_damage=0)
+        link.played.append(card_key)
+        state.chain.append(link)
+        notices.append(Notice(f"{card.name} vai para a corrente (novo elo da corrente)."))
 
     # Briar: a 2ª non-attack action do turno cria Embodiment of Lightning.
     if p.hero_key.startswith("Briar") and p.non_attack_actions_played == 2:
@@ -761,3 +767,65 @@ def _move_card(pile: list[str], card_key: str) -> None:
     if card_key not in pile:
         raise CombatError(f"'{card_key}' não está onde deveria estar")
     pile.remove(card_key)
+
+
+def _bump_blue(p: PlayerState, cards: dict[str, Card], card_key: str) -> None:
+    """Incrementa blue_to_graveyard_this_turn se a carta é blue.
+
+    Um card blue entrando no cemitério neste turno alimenta a condição da
+    passiva watery grave do Gravy Bones (jogar cartas do cemitério).
+    """
+    card = cards.get(card_key)
+    if card is not None and card.color == Color.BLUE:
+        p.blue_to_graveyard_this_turn += 1
+
+
+def _close_combat_chain(
+    state: GameState,
+    cards: dict[str, Card],
+    *,
+    reason: str,
+) -> list[Notice]:
+    """Fecha a corrente de combate movendo as cartas aos cemitérios.
+
+    Jogar uma non-attack action quebra a corrente: as cartas de ataque
+    (played) e de defesa da mão (blocked_by) vão ao cemitério dos respectivos
+    donos; armas e equipamentos permanecem equipados. Permanentas ficam em
+    jogo. Cards blue que entram no cemitério alimentam a passiva watery grave.
+    """
+    notices: list[Notice] = []
+    for link in state.chain:
+        if link.resolved:
+            continue
+        attacker = state.players[link.attacker]
+        defender = state.players[state.opponent_of(link.attacker)]
+
+        moved: list[str] = []
+        for key in link.played:
+            played_card = cards.get(key)
+            if played_card is not None and played_card.is_permanent:
+                continue
+            if key not in attacker.graveyard:
+                attacker.graveyard.append(key)
+            _bump_blue(attacker, cards, key)
+            moved.append(key)
+        if moved:
+            notices.append(Notice(f"{reason}: cartas de ataque ao cemitério: {', '.join(moved)}."))
+
+        moved_def: list[str] = []
+        for key in link.blocked_by:
+            block_card = cards.get(key)
+            if block_card is not None and block_card.is_equipment:
+                continue  # equipamento permanece equipado
+            if key not in defender.graveyard:
+                defender.graveyard.append(key)
+            _bump_blue(defender, cards, key)
+            moved_def.append(key)
+        if moved_def:
+            notices.append(
+                Notice(f"{reason}: cartas de defesa ao cemitério: {', '.join(moved_def)}.")
+            )
+
+        link.resolved = True
+        link.played.clear()
+    return notices

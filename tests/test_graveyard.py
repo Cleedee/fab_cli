@@ -7,6 +7,7 @@ from flesh_and_blood.carddb import load_cards
 from flesh_and_blood.combat import (
     CombatError,
     declare_attack,
+    defend_link,
     discard,
     may_play_from_graveyard,
     play_action,
@@ -254,3 +255,59 @@ def test_remove_token_permanente(state, cards):
     notice = remove_token(state, "A", "Riggermortis (yellow)")
     assert "Riggermortis (yellow)" in notice.text
     assert "Riggermortis (yellow)" not in state.players["A"].permanents
+
+
+# --- Non-attack action quebra a corrente (watery grave via defesa blue) ---
+
+
+def test_defesa_blue_habilitada_condicao_ao_quebrar_corrente(state, cards):
+    # Enigma (B) ataca Gravy (A); o ataque é defendido com um blue; jogar uma
+    # non-attack action quebra a corrente e move a defesa blue ao cemitério,
+    # habilitando a passiva watery grave.
+    p = state.players["A"]
+    p.hand.append("Sirens of Safe Harbor (blue)")  # carta de defesa blue
+
+    b = state.players["B"]
+    b.action_points = 1
+    b.pitch_pool = 1
+    b.hand.append("Golden Tipple (yellow)")
+    declare_attack(state, "B", "Golden Tipple (yellow)", cards)
+    defend_link(state, "A", ["Sirens of Safe Harbor (blue)"], cards)
+
+    assert p.blue_to_graveyard_this_turn == 0  # ainda não habilitado
+
+    p.hand.append("Sizzle (red)")
+    p.pitch_pool = 1
+    notices = play_action(state, "A", "Sizzle (red)", cards)
+
+    assert any("quebrou a corrente" in n.text for n in notices)
+    assert "Sirens of Safe Harbor (blue)" in p.graveyard
+    assert p.blue_to_graveyard_this_turn == 1
+    assert may_play_from_graveyard(state, "A")
+
+
+def test_non_attack_quebrando_corrente_abre_novo_elo(state, cards):
+    # A própria non-attack action (Loot the Hold) quebra a corrente e abre um
+    # elo próprio: ela NÃO vai ao cemitério ainda (fica no novo elo, indo ao
+    # cemitério quando este resolver).
+    p = state.players["A"]
+    p.hand.append("Sirens of Safe Harbor (blue)")  # defesa blue
+    b = state.players["B"]
+    b.action_points = 1
+    b.pitch_pool = 1
+    b.hand.append("Golden Tipple (yellow)")
+    declare_attack(state, "B", "Golden Tipple (yellow)", cards)
+    defend_link(state, "A", ["Sirens of Safe Harbor (blue)"], cards)
+
+    p.hand.append("Loot the Hold (blue)")
+    p.pitch_pool = 1
+    notices = play_action(state, "A", "Loot the Hold (blue)", cards)
+
+    assert any("quebrou a corrente" in n.text for n in notices)
+    # A defesa blue foi ao cemitério pela quebra da corrente.
+    assert "Sirens of Safe Harbor (blue)" in p.graveyard
+    assert p.blue_to_graveyard_this_turn == 1
+    assert may_play_from_graveyard(state, "A")
+    # A Loot abriu um elo próprio e ainda não está no cemitério.
+    assert state.chain[-1].played == ["Loot the Hold (blue)"]
+    assert "Loot the Hold (blue)" not in p.graveyard
