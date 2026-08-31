@@ -323,3 +323,75 @@ def test_chain_roundtrip_survives_serialization(state, cards):
     restored = GameState.from_dict(data)
     link = restored.chain[-1]
     assert isinstance(link, ChainLink) and link.total_damage == 7
+    assert link.played == ["Arcanic Shockwave (red)"]
+
+
+# --- corrente e cemitério --------------------------------------------------
+
+
+def test_play_non_attack_creates_own_chain_link(state, cards):
+    notices = play_action(state, "A", "Sizzle (red)", cards)
+    assert len(state.chain) == 1
+    link = state.chain[0]
+    assert not link.resolved and link.total_damage == 0
+    assert link.played == ["Sizzle (red)"]
+    assert any("novo elo" in n.text for n in notices)
+
+
+def test_play_non_attack_joins_open_attack_link(state, cards):
+    a = state.players["A"]
+    declare_attack(state, "A", "Arcanic Shockwave (red)", cards)
+    a.action_points = 1  # Go Again concedido por outro efeito
+    play_action(state, "A", "Sizzle (red)", cards)
+    assert len(state.chain) == 1
+    link = state.chain[0]
+    assert link.total_damage == 4
+    assert link.played == ["Arcanic Shockwave (red)", "Sizzle (red)"]
+
+
+def test_resolve_moves_played_cards_to_graveyard(state, cards):
+    a = state.players["A"]
+    declare_attack(state, "A", "Arcanic Shockwave (red)", cards)
+    a.action_points = 1
+    play_action(state, "A", "Sizzle (red)", cards)
+    result = resolve_link(state, cards)
+    assert result["physical"] == 4
+    assert "Arcanic Shockwave (red)" in a.graveyard
+    assert "Sizzle (red)" in a.graveyard
+
+
+def test_resolve_non_attack_link_goes_to_graveyard(state, cards):
+    a = state.players["A"]
+    play_action(state, "A", "Sizzle (red)", cards)
+    result = resolve_link(state, cards)
+    assert result["physical"] == 0 and result["arcane"] == 0
+    assert a.graveyard == ["Sizzle (red)"]
+    assert state.chain[0].resolved
+
+
+def test_resolve_permanent_stays_in_play(state, cards):
+    a = state.players["A"]
+    a.hand.append("Riggermortis (yellow)")
+    a.pitch_pool = 1
+    play_action(state, "A", "Riggermortis (yellow)", cards)
+    resolve_link(state, cards)
+    assert a.permanents.get("Riggermortis (yellow)") == [0]
+    assert "Riggermortis (yellow)" not in a.graveyard
+
+
+def test_resolve_weapon_does_not_go_to_graveyard(state, cards):
+    a = state.players["A"]
+    a.pitch_pool = 2
+    a.weapons = ["Star Fall"]
+    declare_attack(state, "A", "Star Fall", cards, is_weapon=True, resource_cost=1)
+    resolve_link(state, cards)
+    assert "Star Fall" not in a.graveyard
+    assert "Star Fall" in a.weapons
+
+
+def test_resolve_arsenal_attack_goes_to_graveyard(state, cards):
+    a = state.players["A"]
+    a.arsenal = "Snatch (red)"
+    declare_attack(state, "A", "Snatch (red)", cards)
+    resolve_link(state, cards)
+    assert "Snatch (red)" in a.graveyard

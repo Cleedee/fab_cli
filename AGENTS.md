@@ -101,6 +101,10 @@ Scripts auxiliares:
 ### Regras mecânicas implementadas em `combat.py`
 - Action points: toda action (incl. arma, "Once per Turn Action") gasta 1 AP;
   Go Again devolve. Sem AP, não joga — mesmo com Go Again pendente.
+- Corrente/cemitério: toda carta jogada vai à corrente — a attack action cria
+  um elo; uma non-attack action cria elo próprio se a corrente estiver vazia ou
+  entra no elo aberto (não quebra combate). `resolve` move as cartas do elo ao
+  cemitério do atacante; permanentes ficam em jogo e armas permanecem equipadas.
 - Dano físico é bloqueado por defesa das cartas; **dano arcano não é bloqueável**
   (prevenção manual: Arcane Barrier/spellvoid entram como parâmetro `*_prevented`).
 - Dominate: defensor usa no máximo 2 cartas, sendo no máximo 1 action card.

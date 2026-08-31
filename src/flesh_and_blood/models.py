@@ -198,7 +198,12 @@ class PlayerState:
 
 @dataclass
 class ChainLink:
-    """Um link da cadeia de combate."""
+    """Um link da cadeia de combate.
+
+    `played` reúne as cartas jogadas para este elo (a attack action e as
+    non-attack actions que entraram nele). Ao resolver, essas cartas vão ao
+    cemitério do lado atacante — exceto permanentes (ficam em jogo) e armas.
+    """
 
     attacker: str  # lado atacante ("A" ou "B")
     card_key: str
@@ -210,6 +215,7 @@ class ChainLink:
     # não altera a matemática do dano.
     dominate: bool = False
     resolved: bool = False
+    played: list[str] = field(default_factory=list)
 
     @property
     def damage_remaining(self) -> int:

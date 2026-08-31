@@ -354,6 +354,18 @@ def play_action(
     p.cards_played_this_turn.append(card_key)
     p.non_attack_actions_played += 1
 
+    # Toda carta jogada vai para a corrente. Sem elo aberto, a non-attack
+    # action cria um elo próprio; com combate em andamento, entra no elo atual.
+    open_link = next((l for l in reversed(state.chain) if not l.resolved), None)
+    if open_link is None:
+        link = ChainLink(attacker=side, card_key=card_key, total_damage=0)
+        link.played.append(card_key)
+        state.chain.append(link)
+        notices.append(Notice(f"{card.name} vai para a corrente (novo elo da corrente)."))
+    else:
+        open_link.played.append(card_key)
+        notices.append(Notice(f"{card.name} entra no elo atual da corrente."))
+
     # Briar: a 2ª non-attack action do turno cria Embodiment of Lightning.
     if p.hero_key.startswith("Briar") and p.non_attack_actions_played == 2:
         p.add_aura(EMBODIMENT_LIGHTNING)
@@ -457,6 +469,9 @@ def declare_attack(
 
     link = ChainLink(attacker=side, card_key=card_key, total_damage=total, dominate=dominate)
     state.chain.append(link)
+    if not is_weapon:
+        # Arma não é uma carta jogada: permanece equipada (não vai ao cemitério).
+        link.played.append(card_key)
     return link
 
 
@@ -694,6 +709,20 @@ def resolve_link(
             notices.append(Notice(f"Briar criou {EMBODIMENT_EARTH} (attack action causou dano)."))
 
     link.resolved = True
+
+    # Ao resolver, as cartas jogadas neste elo vão ao cemitério do lado atacante
+    # (permanentes ficam em jogo; armas nunca entram em `played`).
+    moved: list[str] = []
+    for key in link.played:
+        played_card = cards.get(key)
+        if played_card is not None and played_card.is_permanent:
+            continue
+        state.players[link.attacker].graveyard.append(key)
+        moved.append(key)
+    if moved:
+        notices.append(Notice(f"Cartas do elo foram ao cemitério: {', '.join(moved)}."))
+    link.played.clear()
+
     return {
         "physical": physical,
         "arcane": arcane,

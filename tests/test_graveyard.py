@@ -11,6 +11,7 @@ from flesh_and_blood.combat import (
     may_play_from_graveyard,
     play_action,
     remove_token,
+    resolve_link,
     start_turn,
 )
 from flesh_and_blood.models import Hero, new_game
@@ -126,6 +127,26 @@ def test_play_da_mao_continua_ok(state, cards):
     play_action(state, "A", "Give No Quarter (blue)", cards)
     assert state.players["A"].graveyard == []
     assert "Give No Quarter (blue)" not in state.players["A"].hand
+
+
+def test_play_watery_grave_resolve_volta_ao_cemiterio(state, cards):
+    _enable(state, cards)
+    p = state.players["A"]
+    p.graveyard.append("Give No Quarter (blue)")
+    play_action(state, "A", "Give No Quarter (blue)", cards, source="graveyard")
+    assert "Give No Quarter (blue)" not in p.graveyard
+    resolve_link(state, cards)
+    assert "Give No Quarter (blue)" in p.graveyard
+
+
+def test_attack_watery_grave_resolve_volta_ao_cemiterio(state, cards):
+    _enable(state, cards)
+    p = state.players["A"]
+    p.pitch_pool = 2
+    p.graveyard.append("Angry Bones (blue)")
+    declare_attack(state, "A", "Angry Bones (blue)", cards, source="graveyard")
+    resolve_link(state, cards)
+    assert "Angry Bones (blue)" in p.graveyard
 
 
 # --- declare_attack do cemitério ---
