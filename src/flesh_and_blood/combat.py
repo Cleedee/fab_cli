@@ -571,6 +571,7 @@ def defend_link(
             defense += 1
         block_total += defense
         _move_card(defender.hand, key)
+        defender.graveyard.append(key)
         low_text = card.text.lower()
         if "attacks or defends" in low_text and "arcane damage" in low_text:
             notices.append(Notice(f"{card.name} defendeu: 1 arcano ao atacante.", key))

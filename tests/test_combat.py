@@ -192,11 +192,22 @@ def test_defend_basic_math(state, cards):
     assert result["physical"] == 0 and b.life == 20
 
 
+def test_defend_card_goes_to_graveyard(state, cards):
+    declare_attack(state, "A", "Arcanic Shockwave (red)", cards)  # 4
+    b = state.players["B"]
+    defend_link(state, "B", ["Unmovable (blue)"], cards)
+    assert "Unmovable (blue)" not in b.hand
+    assert "Unmovable (blue)" in b.graveyard
+    resolve_link(state, cards)
+
+
 def test_partial_block_hits(state, cards):
     declare_attack(state, "A", "Arcanic Shockwave (red)", cards)  # 4
     b = state.players["B"]
     b.hand = ["Sizzle (red)", "Snatch (red)"]  # 2 + 2
     defend_link(state, "B", ["Sizzle (red)", "Snatch (red)"], cards)
+    assert "Sizzle (red)" in b.graveyard
+    assert "Snatch (red)" in b.graveyard
     result = resolve_link(state, cards)
     assert result["physical"] == 0  # 4 bloqueado por 4
 
