@@ -1,16 +1,17 @@
 {
   "hands":     {
     "A": [
-      "Snatch (red)", "Sizzle (red)"
+      "Sirens of Safe Harbor (blue)"
     ], 
     "B": [
       "Swabbie (yellow)",
-      "Golden Tipple (yellow)"
+      "Golden Tipple (yellow)",
+      "Riggermortis (yellow)"
     ]
   },
   "arsenal":   {"A": null, "B": null},
   "equipment": {
-    "A": ["Blade Beckoner Helm"], 
+    "A": [], 
     "B": [
       "Myrkhellir Helm", 
       "Garland of Spring",
