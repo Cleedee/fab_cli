@@ -45,10 +45,14 @@ python scripts/build_cards.py --dataset-dir <caminho>/json/english
 
 | Módulo | Responsabilidade |
 |---|---|
-| `models.py` | `Card`, `Hero`, `PlayerState`, `ChainLink`, `GameState`, save/load JSON |
+| `models.py` | `Card`, `Hero`, `PlayerState`, `ChainLink`, `GameState`, save/load JSON; prioridade/reactions (`priority`, `passes`, `ChainLink.responses`); `PlayerState.deck` (topo = índice 0) |
 | `carddb.py` | carrega `data/cards.yaml` |
 | `deck.py` | decklists YAML + validação Silver Age (pool=55, ≤2 cópias, classes do herói) |
-| `combat.py` | operações de turno/combate; valida e devolve `Notice`s (triggers manuais) |
+| `combat.py` | operações de turno/combate; prioridade (`give_priority`/`pass_priority`), `play_reaction`, `draw_from_deck`; valida e devolve `Notice`s (triggers manuais) |
+| `attack.py` | planejadores de turno: `plan_attack` (burst/lethal) e `plan_enigma` (Cosmo/auras) |
+| `defense.py` | sugeridor de defesa (usado pelo bot na defesa) |
+| `bot.py` | política automática: executa `plan_enigma`, defesa via `suggest_defense` |
+| `setup.py` | auto_setup (monta mão inicial, arsenal e `PlayerState.deck` restante) |
 | `cli.py` | ponto de entrada (TUI textual) |
 
 Dados: `data/decks/*.yaml` (decklists), `data/cards.yaml` (gerado).
@@ -119,6 +123,38 @@ Scripts auxiliares:
   `permanents` (zona própria no painel/board/status — não some da mesa);
   `token remove` destrói. Nomes resolvem por parcial (`play "Riggermortis"`).
 - Comando `life <±N> [a|b]`: ajuste manual de vida fora de combate.
+- Motor Enigma (Coso/auras) em `combat.py`:
+  - `activate_hero_ability`: once per turn instant da Enigma (3 recursos, cria
+    Spectral Shield +1), marca `hero_ability_used`; não gasta AP (é instant).
+  - `attack_with_aura`: Cosmo ataca com aura ward (p = ward base + contadores;
+    custo 1, 1º Spectral Shield do turno custa 0; Go Again se a cópia tem
+    contadores; once per turn por aura). A aura NUNCA sai de jogo ao atacar
+    (não entra em `played`). Contagem em `spectral_attacks_this_turn`.
+  - `play_aura_engine` (motor: Spectral Manifestations cria shield +3; Solitary
+    Companion vira aura Ward 3 + shield) e `play_instant_aura` (instants não
+    gastam AP: auras entram na mesa, transcend/proteções vão ao cemitério —
+    nada disso cria/quebra elo). `astral_charge` dá +3 contadores (instant se
+    controla Spectral Shield).
+- Bot (`bot.py`): `run_bot_turn` executa `plan_enigma`/`plan_attack` passo a
+  passo resolvendo cada elo NA HORA (MVP assume oponente sem bloqueio — ajuste
+  manual com `life`) e termina passando a prioridade (`pass_priority`);
+  `choose_bot_defense` usa `suggest_defense`. No app, comando
+  `bot <a|b|off|turn|defend>` ativa o lado e o `next` executa o turno do bot.
+- Prioridade (`combat.py`): `GameState.priority` (None antes de começar) e
+  `GameState.passes`; `new_game` seta para `first_player`, `start_turn` para o
+  lado ativo com `passes=0`. `pass_priority` passa a palavra ao oponente; 2
+  passes consecutivos com elo aberto → `resolve_link` no topo (dano físico
+  aplicado ao defensor) e a palavra volta ao jogador ativo. Agir fora da
+  prioridade gera AVISO amarelo (apoio, não bloqueio). `play_reaction` registra
+  reactions/instants no `ChainLink.responses`: defense reactions bloqueiam
+  (+1{d} Embodiment of Earth se non-attack action), attack reactions somam
+  power, instants/aura-instants delegam a `play_instant_aura`; sempre sem AP e
+  sem quebrar a corrente. Reactions: exige ter a carta na mão e recursos.
+- Draw do deck: `PlayerState.deck` (topo = índice 0) é o restante do pool de
+  deck após o `auto_setup` da mão; `draw` sem args em `app.py` compra do topo
+  (`draw_from_deck`), `draw <carta>` continua manual (registro de partidas do
+  YouTube); comando `deck <a|b> <arquivo>` monta/embaralha o pool de decklists
+  de `data/decks/`.
 
 ## Status
 
@@ -132,3 +168,11 @@ Scripts auxiliares:
       limitação: não troca buff jogável por pitch p/ {r} extra)
 - [x] Fase 3 — TUI Textual
 - [x] Fase 4 — log de decisões + review pós-jogo
+- [x] Fase 5b — bot Enigma: motor Cosmo/auras (260 testes), `plan_enigma`
+      (`attack.py`), `bot.py` (turno + defesa), comando `bot` e auto-turno no `next`
+- [x] Fase 5c — prioridade/reactions formais + draw do deck (279 testes):
+      `GameState.priority`/`passes`, `pass` (2 passes → auto-resolve do topo),
+      `react` (DR/AR/instants em `ChainLink.responses`, sem AP, sem quebrar
+      corrente), AVISO fora da prioridade, `draw` regrado (topo de
+      `PlayerState.deck`), comando `deck <a|b> <arquivo>`, save/load preserva
+      prioridade

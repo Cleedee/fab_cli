@@ -247,3 +247,6 @@ def auto_setup(
         pool_expanded = [key for key, qty in deck.deck_pool.items() for _ in range(qty)]
         rng.shuffle(pool_expanded)
         p.hand.extend(pool_expanded[:hand_size])
+        # Resto do pool vira o deck (topo = índice 0) — habilita `draw` regrado
+        # (comprar do topo) em simulações.
+        p.deck = list(pool_expanded[hand_size:])

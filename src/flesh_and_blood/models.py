@@ -106,6 +106,7 @@ class PlayerState:
 
     hero_key: str
     life: int = 20
+    deck: list[str] = field(default_factory=list)  # topo = índice 0 (simulação)
     hand: list[str] = field(default_factory=list)
     arsenal: str | None = None
     graveyard: list[str] = field(default_factory=list)
@@ -132,6 +133,8 @@ class PlayerState:
     equipment_used_this_turn: list[str] = field(default_factory=list)
     non_attack_actions_played: int = 0
     weapon_attacks_this_turn: list[str] = field(default_factory=list)
+    # Enigma: quantos ataques de Spectral Shield no turno (1º custa 1{r} menos).
+    spectral_attacks_this_turn: int = 0
     first_attack_damage_done: bool = False
     cards_played_this_turn: list[str] = field(default_factory=list)
     # Gravy Bones: um card blue entrando no cemitério neste turno habilita
@@ -216,6 +219,8 @@ class ChainLink:
     dominate: bool = False
     resolved: bool = False
     played: list[str] = field(default_factory=list)
+    # reactions/instants jogados em resposta a este elo (lado, chave).
+    responses: list[tuple[str, str]] = field(default_factory=list)
 
     @property
     def damage_remaining(self) -> int:
@@ -230,6 +235,10 @@ class GameState:
     active_player: str = "A"
     turn: int = 1
     chain: list[ChainLink] = field(default_factory=list)
+    # Prioridade (palavra): None = não iniciada; alterna após cada ação/pass.
+    priority: str | None = None
+    # Passes consecutivos da janela; 2 resolves o topo da corrente.
+    passes: int = 0
 
     def opponent_of(self, side: str) -> str:
         return "B" if side == "A" else "A"
@@ -243,7 +252,13 @@ class GameState:
     def from_dict(cls, data: dict[str, Any]) -> GameState:
         chain = [ChainLink(**link) for link in data["chain"]]
         players = {side: PlayerState(**pstate) for side, pstate in data["players"].items()}
-        state = cls(players=players, turn=data["turn"], active_player=data["active_player"])
+        state = cls(
+            players=players,
+            turn=data["turn"],
+            active_player=data["active_player"],
+            priority=data.get("priority"),
+            passes=data.get("passes", 0),
+        )
         state.chain = chain
         return state
 
@@ -263,6 +278,7 @@ def new_game(hero_a: Hero, hero_b: Hero, first_player: str = "A") -> GameState:
     return GameState(
         players={"A": make("A", hero_a), "B": make("B", hero_b)},
         active_player=first_player,
+        priority=first_player,
     )
 
 

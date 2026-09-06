@@ -6,6 +6,7 @@ O usuário controla AMBOS os lados via comandos textuais.
 
 from __future__ import annotations
 
+import random
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,7 +20,9 @@ from textual.screen import ModalScreen
 from textual.widgets import Footer, Header, Input, ListItem, ListView, RichLog, Static
 
 from flesh_and_blood import attack as atk
+from flesh_and_blood import bot as bt
 from flesh_and_blood import combat as cmb
+from flesh_and_blood import deck as dk
 from flesh_and_blood import defense as dfs
 from flesh_and_blood import probabilities as prob
 from flesh_and_blood import recorder as rec
@@ -131,6 +134,25 @@ def _parse_grave_source(args: list[str]) -> tuple[str, list[str]]:
         else:
             rest.append(a)
     return source, rest
+
+
+def _enigma_step_label(step: tuple, cards: dict[str, Card]) -> str:
+    """Formata um step do plano Enigma para exibição."""
+    kind = step[0]
+    key = step[1] if len(step) > 1 else None
+    if kind == "pitch":
+        return f"Pitch de {key}"
+    if kind == "activate_enigma":
+        return "Ativar Enigma: criar Spectral Shield +1 contador"
+    if kind == "play":
+        return f"Jogar {cards[key].name}"
+    if kind == "cosmo":
+        return f"Cosmo ataca com a aura {key}"
+    if kind == "attack":
+        return f"Ataque de {cards[key].name}"
+    if kind == "resolve":
+        return "Resolver corrente"
+    return f"{kind} {key or ''}".strip()
 
 
 def _card_details(key: str, card: Card) -> list[str]:
@@ -639,6 +661,8 @@ class FaBApp(App[None]):
         self._undo_stack = []
         self._replay_index: int = 0
         self._replay_mode: bool = False
+        # Bot: lado controlado automaticamente (None = desligado).
+        self.bot_side: str | None = None
         self.session_log = rec.SessionLog(
             hero_a=matchup.hero_a.name,
             hero_b=matchup.hero_b.name,
@@ -835,8 +859,12 @@ class FaBApp(App[None]):
             "defend": self._cmd_defend,
             "equip": self._cmd_equip,
             "resolve": self._cmd_resolve,
+            "pass": self._cmd_pass,
+            "react": self._cmd_react,
+            "deck": self._cmd_deck,
             "next": self._cmd_next,
             "switch": self._cmd_switch,
+            "bot": self._cmd_bot,
             "read": self._cmd_read,
             "plan": self._cmd_plan,
             "suggest": self._cmd_suggest,
@@ -871,7 +899,12 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]board[/] [hand|field|piles|a|b] — navega cartas em janela modal")
         self._log_notice("  [bold]read[/] [carta|N]          — detalhes de uma carta (modal)")
         self._log_notice("  [bold]card[/] <carta>            — mostra detalhes da carta")
-        self._log_notice("  [bold]draw[/] <carta>           — adiciona carta à mão do ativo")
+        self._log_notice(
+            "  [bold]draw[/]                         — compra do topo do deck (regras)"
+        )
+        self._log_notice(
+            "  [bold]draw[/] <carta>           — adiciona carta à mão do ativo (manual)"
+        )
         self._log_notice("  [bold]pitch[/] <carta>          — dá pitch de uma carta da mão")
         self._log_notice("  [bold]discard[/] <carta>        — descarta carta da mão")
         self._log_notice("  [bold]arsenal[/] <carta>        — coloca carta no arsenal")
@@ -887,8 +920,14 @@ class FaBApp(App[None]):
         self._log_notice("  [bold]defend[/] [auto|N|suggest] — bloqueia link oponente")
         self._log_notice("  [bold]equip[/] <equip>           — usa equipamento p/ defesa")
         self._log_notice("  [bold]resolve[/] [ward=N] [arcane=N] — resolve link")
+        self._log_notice(
+            "  [bold]pass[/] [a|b]            — passa a prioridade (2 passes resolvem)"
+        )
+        self._log_notice("  [bold]react[/] <carta> [a|b]   — reaction/instant em resposta ao elo")
+        self._log_notice("  [bold]deck[/] <a|b> <arquivo>  — monta o deck do lado (simulação)")
         self._log_notice("  [bold]next[/]                    — encerra turno / avança")
         self._log_notice("  [bold]switch[/]                  — troca jogador ativo")
+        self._log_notice("  [bold]bot[/] <a|b|off|turn|defend> — bot no lado (turno/defesa)")
         self._log_notice("  [bold]plan[/]                    — sugere linha de ataque")
         self._log_notice("  [bold]suggest[/]                 — sugere bloqueio")
         self._log_notice("  [bold]prob[/] <copias> <deck> <compras> [min] — probabilidade")
@@ -1015,9 +1054,13 @@ class FaBApp(App[None]):
             self._log_notice(line)
 
     def _cmd_draw(self, args: list[str]) -> None:
-        """draw <carta> — adiciona à mão do jogador ativo."""
+        """draw — compra do topo do deck (regras); draw <carta> — ajuste manual."""
         if not args:
-            raise ValueError("uso: draw <carta>")
+            side = self.game_state.active_player
+            notice = cmb.draw_from_deck(self.game_state, side)
+            self._log_notice(f"🃏 {notice.text}")
+            self._record("draw", notice.text)
+            return
         key = self._resolve_card(" ".join(args))
         p = self.game_state.players[self.game_state.active_player]
         p.hand.append(key)
@@ -1068,11 +1111,12 @@ class FaBApp(App[None]):
         if not args:
             raise ValueError("uso: use <token> (Gold, Silver, Copper)")
         name = " ".join(args)
-        notice = cmb.use_item_token(
-            self.game_state, self.game_state.active_player, name, self.cards
-        )
+        side = self.game_state.active_player
+        self._warn_priority(side)
+        notice = cmb.use_item_token(self.game_state, side, name, self.cards)
         self._log_notice(f"🎯 {notice.text}")
         self._record("use", notice.text)
+        self._set_priority(side)
 
     def _cmd_life(self, args: list[str]) -> None:
         """life <±N> [a|b] — ajusta a vida de um jogador manualmente.
@@ -1114,12 +1158,13 @@ class FaBApp(App[None]):
         if not card_args:
             raise ValueError("uso: play <carta> [from=graveyard]")
         key = self._resolve_card(" ".join(card_args))
-        notices = cmb.play_action(
-            self.game_state, self.game_state.active_player, key, self.cards, source=source
-        )
+        side = self.game_state.active_player
+        self._warn_priority(side)
+        notices = cmb.play_action(self.game_state, side, key, self.cards, source=source)
         for n in notices:
             self._log_notice(f"⚡ {n.text}")
         self._record("play", f"Jogou {key} ({source})", result=[n.text for n in notices])
+        self._set_priority(side)
 
     def _cmd_attack(self, args: list[str]) -> None:
         """attack <carta> [dominate=1] [from=graveyard] — declara ataque."""
@@ -1134,9 +1179,11 @@ class FaBApp(App[None]):
         if not card_args:
             raise ValueError("uso: attack <carta> [dominate=1] [from=graveyard]")
         key = self._resolve_card(" ".join(card_args))
+        side = self.game_state.active_player
+        self._warn_priority(side)
         link = cmb.declare_attack(
             self.game_state,
-            self.game_state.active_player,
+            side,
             key,
             self.cards,
             dominate=dominate,
@@ -1150,6 +1197,7 @@ class FaBApp(App[None]):
             "attack",
             f"{key} ({link.total_damage}{{p}}){dom_str} ({source})",
         )
+        self._set_priority(side)
 
     def _cmd_weapon(self, args: list[str]) -> None:
         """weapon [1|2] — ataca com a arma (1 ou 2 para escolher, se houver mais de uma)."""
@@ -1165,9 +1213,11 @@ class FaBApp(App[None]):
         card = self.cards.get(weapon_key)
         if not card:
             raise cmb.CombatError(f"Arma {weapon_key} não encontrada no registro")
+        side = self.game_state.active_player
+        self._warn_priority(side)
         link = cmb.declare_attack(
             self.game_state,
-            self.game_state.active_player,
+            side,
             weapon_key,
             self.cards,
             is_weapon=True,
@@ -1176,24 +1226,31 @@ class FaBApp(App[None]):
         )
         self._log_notice(f"⚔ Ataque de arma: {weapon_key} ({link.total_damage}{{p}})")
         self._record("weapon", f"{weapon_key} ({link.total_damage}{{p}})")
+        self._set_priority(side)
 
     def _cmd_boost(self, args: list[str]) -> None:
         """boost <N> — +N power no link atual."""
         if not args:
             raise ValueError("uso: boost <N>")
         amount = int(args[0])
-        n = cmb.boost_link(self.game_state, self.game_state.active_player, amount)
+        side = self.game_state.active_player
+        self._warn_priority(side)
+        n = cmb.boost_link(self.game_state, side, amount)
         self._log_notice(n.text)
         self._record("boost", f"+{amount}{{p}}")
+        self._set_priority(side)
 
     def _cmd_arcane(self, args: list[str]) -> None:
         """arcane <N> — +N arcano no link atual."""
         if not args:
             raise ValueError("uso: arcane <N>")
         amount = int(args[0])
-        n = cmb.set_arcane_on_link(self.game_state, self.game_state.active_player, amount, None)
+        side = self.game_state.active_player
+        self._warn_priority(side)
+        n = cmb.set_arcane_on_link(self.game_state, side, amount, None)
         self._log_notice(n.text)
         self._record("arcane", f"+{amount}{{a}}")
+        self._set_priority(side)
 
     def _cmd_defend(self, args: list[str]) -> None:
         """defend [auto|N|suggest] ou defend <carta> [carta ...] — bloqueia link.
@@ -1214,7 +1271,9 @@ class FaBApp(App[None]):
             if link is None:
                 self._log_notice("[yellow]Nenhum ataque ativo para defender.[/]")
                 return
+            self._warn_priority(defender)
             self._apply_defense_suggestion(defender, link, 1)
+            self._set_priority(defender)
             return
 
         arg = args[0].lower()
@@ -1227,14 +1286,18 @@ class FaBApp(App[None]):
             if link is None:
                 self._log_notice("[yellow]Nenhum ataque ativo para defender.[/]")
                 return
+            self._warn_priority(defender)
             self._apply_defense_suggestion(defender, link, 1)
+            self._set_priority(defender)
             return
 
         if arg.isdigit():
             if link is None:
                 self._log_notice("[yellow]Nenhum ataque ativo para defender.[/]")
                 return
+            self._warn_priority(defender)
             self._apply_defense_suggestion(defender, link, int(arg))
+            self._set_priority(defender)
             return
 
         # Modo original: defend <carta> [carta ...]
@@ -1242,6 +1305,7 @@ class FaBApp(App[None]):
         for a in args:
             key = self._resolve_card(a, side=defender)
             keys.append(key)
+        self._warn_priority(defender)
         notices = cmb.defend_link(self.game_state, defender, keys, self.cards)
         for n in notices:
             self._log_notice(f"🛡 {n.text}")
@@ -1250,6 +1314,7 @@ class FaBApp(App[None]):
             f"Defendeu com {', '.join(keys)}",
             result=[n.text for n in notices],
         )
+        self._set_priority(defender)
 
     def _apply_defense_suggestion(self, defender: str, link, suggestion_index: int) -> None:
         """Aplica uma sugestão de defesa por índice (1-based)."""
@@ -1314,9 +1379,11 @@ class FaBApp(App[None]):
             raise ValueError("uso: equip <nome>")
         defender = self.game_state.opponent_of(self.game_state.active_player)
         key = self._resolve_card(" ".join(args), side=defender)
+        self._warn_priority(defender)
         gained = cmb.use_equipment_defense(self.game_state, defender, key, self.cards)
         self._log_notice(f"🛡 Equipamento {key}: +{gained} de bloqueio.")
         self._record("equip", f"{key}: +{gained} de bloqueio")
+        self._set_priority(defender)
 
     def _cmd_resolve(self, args: list[str]) -> None:
         """resolve [ward=N] [arcane=N] — resolve o link atual."""
@@ -1345,6 +1412,8 @@ class FaBApp(App[None]):
             f"{result['physical']}{{p}} + {result['arcane']}{{a}} → {'acertou' if result['hit'] else 'bloqueado'}",
             result=[n.text for n in result["notices"]],
         )
+        # Resolvido: a palavra volta ao jogador ativo (nova janela).
+        cmb.give_priority(self.game_state, self.game_state.active_player)
 
     def _cmd_next(self, args: list[str]) -> None:
         """next — encerra o turno do ativo e inicia o do oponente."""
@@ -1362,6 +1431,105 @@ class FaBApp(App[None]):
             "next",
             f"Turno {self.game_state.turn} → {self.matchup.label(new_active)}",
         )
+        if self.bot_side == new_active:
+            self._run_bot_turn()
+
+    def _cmd_bot(self, args: list[str]) -> None:
+        """bot <a|b|off|turn|defend> — controla o lado do bot."""
+        if not args:
+            state = "desligado" if self.bot_side is None else f"lado {self.bot_side}"
+            self._log_notice(f"🤖 Bot {state}.")
+            return
+        cmd = args[0].lower()
+        if cmd == "off":
+            self.bot_side = None
+            self._log_notice("🤖 Bot desligado.")
+        elif cmd in ("a", "b"):
+            self.bot_side = cmd.upper()
+            self._log_notice(f"🤖 Bot ativo no lado {self.bot_side}.")
+        elif cmd == "turn":
+            self._run_bot_turn()
+        elif cmd == "defend":
+            side = args[1].upper() if len(args) > 1 and args[1].upper() in ("A", "B") else None
+            target = side or self.bot_side
+            target = target or self.game_state.active_player
+            self._warn_priority(target)
+            for line in bt.choose_bot_defense(self.game_state, target, self.cards):
+                self._log_notice(f"🤖 {line}")
+            self._set_priority(target)
+        else:
+            self._log_notice(f"🤖 Comando inválido: '{cmd}'. Use a|b|off|turn|defend.")
+
+    def _run_bot_turn(self) -> None:
+        """Executa o turno do bot (lado ativo) e registra tudo no log."""
+        active = self.game_state.active_player
+        self._log_notice(f"[bold magenta]🤖 Bot executa turno — {self.matchup.label(active)}[/]")
+        for line in bt.run_bot_turn(self.game_state, active, self.cards):
+            self._log_notice(f"🤖 {line}")
+        self._record("bot_turn", f"Turno automático do bot ({self.matchup.label(active)}).")
+
+    def _set_priority(self, side: str) -> None:
+        """Após uma ação, transfere a palavra ao oponente (zerando passes)."""
+        cmb.give_priority(self.game_state, self.game_state.opponent_of(side))
+
+    def _warn_priority(self, side: str) -> None:
+        """AVISO (não bloqueia) se alguém agir fora da prioridade."""
+        pr = self.game_state.priority
+        if pr is not None and pr != side:
+            self._log_notice(f"[yellow]AVISO: prioridade é de {pr}, não de {side}.[/]")
+
+    def _cmd_pass(self, args: list[str]) -> None:
+        """pass [a|b] — passa a prioridade; 2 passes consecutivos resolvem o topo."""
+        side = self.game_state.priority or self.game_state.active_player
+        if args and args[0].lower() in ("a", "b"):
+            side = args[0].upper()
+        notices = cmb.pass_priority(self.game_state, side, self.cards)
+        for n in notices:
+            self._log_notice(f"🤝 {n.text}")
+        self._record("pass", f"{side} passou a prioridade")
+
+    def _cmd_react(self, args: list[str]) -> None:
+        """react <carta> [a|b] — reaction/instant em resposta ao elo aberto."""
+        if not args:
+            raise ValueError("uso: react <carta> [a|b]")
+        side = self.game_state.priority or self.game_state.active_player
+        card_args = list(args)
+        if args[-1].lower() in ("a", "b"):
+            side = args[-1].upper()
+            card_args = args[:-1]
+        key = self._resolve_card(" ".join(card_args), side=side)
+        self._warn_priority(side)
+        notices = cmb.play_reaction(self.game_state, side, key, self.cards)
+        for n in notices:
+            self._log_notice(f"⚡ {n.text}")
+        self._record("react", f"{side}: reação {key}", result=[n.text for n in notices])
+        self._set_priority(side)
+
+    def _cmd_deck(self, args: list[str]) -> None:
+        """deck <a|b> <arquivo> — monta o deck (pool expandido) do lado a partir de data/decks/."""
+        if len(args) < 2:
+            raise ValueError("uso: deck <a|b> <arquivo> (de data/decks/)")
+        side = args[0].upper()
+        if side not in ("A", "B"):
+            raise ValueError("lado deve ser A ou B")
+        nome = args[1]
+        if not nome.endswith(".yaml"):
+            nome += ".yaml"
+        path = DECK_DIR / nome
+        if not path.exists():
+            raise ValueError(f"deck não encontrado: {path}")
+        dl = dk.load_decklist(path)
+        errors = dk.validate(dl, self.cards)
+        if errors:
+            raise ValueError("deck inválido: " + "; ".join(errors[:5]))
+        pool = [k for k, qty in dl.deck_pool.items() for _ in range(qty)]
+        random.Random().shuffle(pool)
+        self.game_state.players[side].deck = pool
+        self._log_notice(
+            f"🃏 Deck do lado {side} montado: {len(pool)} cartas "
+            f"(hero: {dl.hero}). 'draw' compra do topo."
+        )
+        self._record("deck", f"{side}: deck montado ({len(pool)} cartas) de {nome}")
 
     def _cmd_switch(self, args: list[str]) -> None:
         """switch — troca o lado 'ativo' (quem ataca/age)."""
@@ -1378,6 +1546,29 @@ class FaBApp(App[None]):
         weapon_key = me.weapons[0] if me.weapons else None
         opp = self.game_state.opponent_of(side)
         opp_life = self.game_state.players[opp].life
+
+        if me.hero_key == "Enigma":
+            plan = atk.plan_enigma(
+                self.game_state,
+                side,
+                self.cards,
+                opponent_life=opp_life,
+            )
+            self._log_notice(
+                f"[bold cyan]📋 Plano do Enigma (Cosmo/auras):[/] {self.matchup.label(side)} "
+                f"(AP {me.action_points}, pool {me.pitch_pool}{{r}})"
+            )
+            for step in plan.steps:
+                self._log_notice(f"  • {_enigma_step_label(step, self.cards)}")
+            self._log_notice(
+                f"  Dano estimado: {plan.physical}  "
+                f"Letal: {'[red]SIM[/]' if plan.lethal else '[green]não[/]'}"
+            )
+            if plan.pitched:
+                self._log_notice(f"  Pitch: {', '.join(plan.pitched)}")
+            for n in plan.notes:
+                self._log_notice(f"  [dim]• {n}[/]")
+            return
 
         plan = atk.plan_attack(
             self.game_state,
@@ -1477,6 +1668,8 @@ class FaBApp(App[None]):
             p = self.game_state.players[side]
             self._log_notice(f"[bold]--- {self.matchup.label(side)} ---[/]")
             self._log_notice(f"  Vida: {p.life}  AP: {p.action_points}  Pool: {p.pitch_pool}")
+            deck_str = f"  Deck ({len(p.deck)} cartas)" if p.deck else "  Deck: (não montado)"
+            self._log_notice(deck_str)
             self._log_notice(f"  Mão ({len(p.hand)}): {p.hand}")
             self._log_notice(f"  Arsenal: {p.arsenal}")
             self._log_notice(f"  Auras: {dict(p.auras)}")
@@ -1485,6 +1678,9 @@ class FaBApp(App[None]):
             self._log_notice(f"  Graveyard: {p.graveyard}")
             self._log_notice(f"  Banished: {p.banished}")
             self._log_notice(f"  Equip destruídos: {p.equipment_destroyed}")
+        pr = self.game_state.priority
+        pr_str = f"Prioridade: [bold]{pr}[/]" if pr else "Prioridade: (não iniciada)"
+        self._log_notice(f"[bold]{pr_str}  Passes: {self.game_state.passes}[/]")
         self._log_notice(f"[bold]--- Chain ({len(self.game_state.chain)} links) ---[/]")
         for link in self.game_state.chain:
             resolved = "[resolvido]" if link.resolved else "[aberto]"
@@ -1492,6 +1688,9 @@ class FaBApp(App[None]):
                 f"  {link.card_key}: {link.total_damage}{{p}} "
                 f"(bloqueado {link.blocked_damage}, arcano {link.arcane_damage}) {resolved}"
             )
+            if link.responses:
+                resp = ", ".join(f"{s}:{k}" for s, k in link.responses)
+                self._log_notice(f"    responses: {resp}")
 
     def _cmd_clear(self, args: list[str]) -> None:
         """clear — limpa notificações."""

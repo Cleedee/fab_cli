@@ -42,11 +42,14 @@ def start_turn(state: GameState, side: str) -> list[Notice]:
     p = state.players[side]
     state.active_player = side
     state.turn += 1
+    state.priority = side
+    state.passes = 0
     p.action_points = 1
     p.hero_ability_used = False
     p.equipment_used_this_turn.clear()
     p.non_attack_actions_played = 0
     p.weapon_attacks_this_turn.clear()
+    p.spectral_attacks_this_turn = 0
     p.first_attack_damage_done = False
     p.cards_played_this_turn.clear()
     p.blue_to_graveyard_this_turn = 0
@@ -117,6 +120,54 @@ def end_turn(state: GameState) -> list[Notice]:
 
 
 # ---------------------------------------------------------------------------
+# Prioridade
+# ---------------------------------------------------------------------------
+
+
+def give_priority(state: GameState, side: str) -> None:
+    """Transfere a palavra para `side`, zerando a contagem de passes.
+
+    Sem validação (filosofia de apoio): o app emite AVISO se alguém agir fora
+    da sua prioridade, mas não bloqueia o override manual.
+    """
+    state.priority = side
+    state.passes = 0
+
+
+def pass_priority(state: GameState, side: str, cards: dict[str, Card]) -> list[Notice]:
+    """Lado `side` passa a prioridade.
+
+    - Fora da prioridade: AVISO, mas o passe é contado (filosofia manual).
+    - 1º passe: devolve a palavra ao oponente (janela continua aberta).
+    - 2º passe consecutivo: resolve o topo da corrente automaticamente e
+      devolve a palavra ao jogador ativo (nova janela).
+    """
+    notices: list[Notice] = []
+    if state.priority is not None and state.priority != side:
+        notices.append(Notice(f"Aviso: prioridade é de {state.priority}, não de {side} (manual)."))
+    state.passes += 1
+    open_link = next((l for l in reversed(state.chain) if not l.resolved), None)
+    if state.passes >= 2 and open_link is not None:
+        result = resolve_link(state, cards)
+        notices.extend(result["notices"])
+        notices.append(
+            Notice(
+                f"Ambos passaram: link resolvido "
+                f"({result['physical']} físico, {result['arcane']} arcano)."
+            )
+        )
+        state.priority = state.active_player
+        state.passes = 0
+        return notices
+    if state.passes >= 2:
+        state.priority = state.active_player
+        state.passes = 0
+        return notices
+    state.priority = state.opponent_of(side)
+    return notices
+
+
+# ---------------------------------------------------------------------------
 # Recursos e mão
 # ---------------------------------------------------------------------------
 
@@ -129,6 +180,20 @@ def pitch(state: GameState, side: str, card_key: str, cards: dict[str, Card]) ->
     _move_card(state.players[side].hand, card_key)
     state.players[side].pitch_pool += card.pitch
     return card.pitch
+
+
+def draw_from_deck(state: GameState, side: str) -> Notice:
+    """Compra a carta do topo do deck (regras) para a mão.
+
+    Deck em `PlayerState.deck` (topo = índice 0), preenchido por auto_setup ou
+    pelo comando `deck`. Retorna Notice do que foi comprado.
+    """
+    p = state.players[side]
+    if not p.deck:
+        raise CombatError("deck vazio — use 'deck <lado> <arquivo>' ou 'draw <carta>' manual")
+    key = p.deck.pop(0)
+    p.hand.append(key)
+    return Notice(f"{side} comprou do topo: {key}.")
 
 
 def place_arsenal(state: GameState, side: str, card_key: str) -> None:
@@ -386,6 +451,221 @@ def play_action(
     return notices
 
 
+def play_instant_aura(
+    state: GameState,
+    side: str,
+    card_key: str,
+    cards: dict[str, Card],
+    *,
+    counters_on_enter: int = 0,
+) -> Notice:
+    """Joga um instant da mão (ex.: Waxing/Waning Vengeance, transcend engine).
+
+    Instants não gastam action points; o custo é pago do pool. A simplificação:
+    - cartas com tipo Aura entram em jogo imediatamente (como um token);
+    - demais instants (transcend, proteções) vão direto ao cemitério após o
+      efeito (não modelado além do lance);
+    nada disso cria elo de corrente nem quebra a corrente de combate.
+
+    counters_on_enter: contadores +1{p} condicionais (ex.: Waxing Specter se
+    um card blue foi pichado no turno).
+    """
+    p = state.players[side]
+    card = _require(cards, card_key)
+    if "Instant" not in card.types:
+        raise CombatError(f"{card.name} não é um instant")
+    if "Action" in card.types:
+        raise CombatError(f"{card.name} é um instant-action; use play_action")
+    if card_key not in p.hand:
+        raise CombatError(f"{card.name} não está na mão")
+    cost = card.cost or 0
+    if p.pitch_pool < cost:
+        raise CombatError(f"recursos insuficientes ({p.pitch_pool} < {cost})")
+    p.pitch_pool -= cost
+    _move_card(p.hand, card_key)
+    p.cards_played_this_turn.append(card_key)
+    if "Aura" not in card.types:
+        p.graveyard.append(card_key)
+        return Notice(f"{card.name} jogada (instant).")
+    p.add_aura(card_key, counters_on_enter)
+    if counters_on_enter:
+        return Notice(f"{card.name}: aura criada (+{counters_on_enter} contador).")
+    return Notice(f"{card.name}: aura criada.")
+
+
+def play_reaction(
+    state: GameState,
+    side: str,
+    card_key: str,
+    cards: dict[str, Card],
+) -> list[Notice]:
+    """Joga reaction/instant em resposta ao elo aberto.
+
+    Reactions e instants não gastam AP e não quebram a corrente:
+    - Defense Reaction: defende o elo do oponente (+defesa, Embodiment of
+      Earth incluso); a carta vai ao cemitério do defensor.
+    - Attack Reaction: soma o poder ao elo do próprio lado; vai ao cemitério.
+    - Instant com tipo Aura: delega a play_instant_aura (aura entra na mesa).
+    - Instant genérico: registrado na `responses` do elo e vai ao cemitério
+      (efeito não modelado — aplicar manualmente).
+
+    A carta fica listada em `responses` do elo (visível no board/status).
+    """
+    notices: list[Notice] = []
+    p = state.players[side]
+    card = _require(cards, card_key)
+    is_dr = "Defense Reaction" in card.types
+    is_ar = "Attack Reaction" in card.types
+    is_instant = "Instant" in card.types
+    if not (is_dr or is_ar or is_instant):
+        raise CombatError(f"{card.name} não é reaction nem instant")
+    if card_key not in p.hand:
+        raise CombatError(f"{card.name} não está na mão")
+
+    if is_instant and "Aura" in card.types:
+        cost = card.cost or 0
+        if p.pitch_pool < cost:
+            raise CombatError(f"recursos insuficientes ({p.pitch_pool} < {cost})")
+        notice = play_instant_aura(state, side, card_key, cards)
+        notices.append(notice)
+        link = next((l for l in reversed(state.chain) if not l.resolved), None)
+        if link is not None:
+            link.responses.append((side, card_key))
+        return notices
+
+    cost = card.cost or 0
+    if p.pitch_pool < cost:
+        raise CombatError(f"recursos insuficientes ({p.pitch_pool} < {cost})")
+    p.pitch_pool -= cost
+    _move_card(p.hand, card_key)
+    p.cards_played_this_turn.append(card_key)
+    p.graveyard.append(card_key)
+
+    if is_dr:
+        attacker_side = state.opponent_of(side)
+        link = current_link(state, attacker_side)
+        if link is None:
+            raise CombatError("nenhum chain link do oponente para defender")
+        defense = card.defense or 0
+        if defense == 0:
+            notices.append(
+                Notice(f"{card.name}: defesa 0 — efeito não modelado, aplicar manualmente.")
+            )
+        else:
+            earth_bonus = bool(p.auras.get(EMBODIMENT_EARTH))
+            if earth_bonus and card.is_non_attack_action:
+                defense += 1
+            link.blocked_by.append(card_key)
+            link.blocked_damage += defense
+            notices.append(Notice(f"{card.name} defendeu +{defense}."))
+        link.responses.append((side, card_key))
+        return notices
+
+    if is_ar:
+        link = current_link(state, side)
+        if link is None:
+            raise CombatError("nenhum chain link aberto para o attack reaction")
+        power = card.power or 0
+        if power:
+            link.total_damage += power
+            notices.append(Notice(f"{card.name}: ataque +{power}{{p}}."))
+        else:
+            notices.append(Notice(f"{card.name}: reação sem poder — efeito não modelado."))
+        link.responses.append((side, card_key))
+        return notices
+
+    link = next((l for l in reversed(state.chain) if not l.resolved), None)
+    if link is not None:
+        link.responses.append((side, card_key))
+    notices.append(Notice(f"{card.name} (instant): efeito não modelado — aplicar manualmente."))
+    return notices
+
+
+def _has_other_illusionist_aura(p: PlayerState, cards: dict[str, Card], self_key: str) -> bool:
+    for k in p.auras:
+        c = cards.get(k)
+        if c is not None and "Illusionist" in c.types and k != self_key:
+            return True
+    return False
+
+
+def play_aura_engine(
+    state: GameState, side: str, card_key: str, cards: dict[str, Card]
+) -> list[Notice]:
+    """Joga o motor de auras do Enigma: Spectral Manifestations ou Solitary Companion.
+
+    - Spectral Manifestations: custo 2, Go Again; cria Spectral Shield e, se não
+      controla outras auras Illusionist, com +3 contadores (Ward 4).
+    - Solitary Companion: custo 0; entra como aura Ward 3 e cria Spectral Shield
+      se não controla outras auras Illusionist.
+    """
+    card = _require(cards, card_key)
+    name = card.name
+    if name not in ("Spectral Manifestations", "Solitary Companion"):
+        raise CombatError(f"{name} não é do motor de auras do Enigma")
+    p = state.players[side]
+    go_again = name == "Spectral Manifestations"
+    notices = play_action(state, side, card_key, cards, go_again_earned=go_again)
+    if name == "Spectral Manifestations":
+        counters = 3 if not _has_other_illusionist_aura(p, cards, card_key) else 0
+        p.add_aura(SPECTRAL_SHIELD, counters)
+        if counters:
+            notices.append(Notice("Spectral Shield criado com +3 contadores (Ward 4)."))
+        else:
+            notices.append(Notice("Spectral Shield criado (Ward 1, sem o bônus)."))
+    else:
+        p.add_aura(card_key, 0)
+        if not _has_other_illusionist_aura(p, cards, card_key):
+            p.add_aura(SPECTRAL_SHIELD, 0)
+            notices.append(Notice("Solitary Companion: Spectral Shield criado (Ward 1)."))
+        notices.append(Notice("Solitary Companion: aura Ward 3 criada."))
+    return notices
+
+
+def astral_charge(state: GameState, side: str, cards: dict[str, Card]) -> list[Notice]:
+    """Joga Astral Etchings: +3 contadores numa aura com ward.
+
+    Se você controla um Spectral Shield, a carta é jogada como instant (sem
+    custo de AP); senão é uma action (gasta 1 AP). O alvo é a aura com ward de
+    maior total (a que agrega mais dano/defesa).
+    """
+    p = state.players[side]
+    candidates = [k for k in p.hand if cards.get(k) and "Astral Etchings" in cards[k].name]
+    if not candidates:
+        raise CombatError("Astral Etchings não está na mão")
+    card_key = candidates[0]
+    card = _require(cards, card_key)
+    cost = card.cost or 0
+    if p.pitch_pool < cost:
+        raise CombatError(f"recursos insuficientes ({p.pitch_pool} < {cost})")
+
+    targets = [k for k in p.auras if aura_base_ward(cards.get(k)) > 0]
+    if not targets:
+        raise CombatError("nenhuma aura com ward para receber os contadores")
+    target = max(targets, key=lambda k: ward_value(p, k))
+    copies = p.auras[target]
+    idx = max(range(len(copies)), key=lambda i: copies[i])
+    copies[idx] += 3
+
+    if has_aura(p, SPECTRAL_SHIELD):
+        # instant: não usa AP
+        notices: list[Notice] = [
+            Notice("Astral Etchings jogada como instant (controla Spectral Shield).")
+        ]
+    else:
+        _use_ap(p, False)
+        notices = [Notice("Astral Etchings jogada (action).")]
+
+    p.pitch_pool -= cost
+    _move_card(p.hand, card_key)
+    p.cards_played_this_turn.append(card_key)
+    link = ChainLink(attacker=side, card_key=card_key, total_damage=0)
+    link.played.append(card_key)
+    state.chain.append(link)
+    notices.append(Notice(f"+3 contadores em {target} (cópia +{copies[idx]})."))
+    return notices
+
+
 # ---------------------------------------------------------------------------
 # Ataques
 # ---------------------------------------------------------------------------
@@ -625,6 +905,89 @@ def use_equipment_defense(
 def ward_value(player: PlayerState, aura_key: str) -> int:
     """Ward total somando todas as cópias da aura (1 + contadores cada)."""
     return sum(1 + counters for counters in player.auras.get(aura_key, []))
+
+
+def aura_base_ward(card: Card) -> int:
+    """Ward base da carta a partir da keyword (ex.: 'Ward 3' -> 3)."""
+    for kw in card.keywords:
+        if kw.startswith("Ward"):
+            digits = kw.replace("Ward", "").strip()
+            if digits.isdigit():
+                return int(digits)
+    return 0
+
+
+def activate_hero_ability(state: GameState, side: str, cards: dict[str, Card]) -> Notice:
+    """Ativa a habilidade uma vez por turno do Enigma (instant).
+
+    Enigma: 'Once per Turn Instant - 3 recursos: crie um Spectral Shield
+    token com um contador +1'. É instant (não gasta AP); consome os recursos
+    e marca hero_ability_used.
+    """
+    p = state.players[side]
+    if p.hero_key != "Enigma":
+        raise CombatError(f"{p.hero_key} não tem esta habilidade de herói")
+    if p.hero_ability_used:
+        raise CombatError("habilidade do Enigma já usada neste turno")
+    if p.pitch_pool < 3:
+        raise CombatError(f"recursos insuficientes ({p.pitch_pool} < 3)")
+    p.pitch_pool -= 3
+    p.hero_ability_used = True
+    p.add_aura(SPECTRAL_SHIELD, 1)
+    return Notice("Enigma ativada: Spectral Shield criado com +1 contador.")
+
+
+def attack_with_aura(
+    state: GameState,
+    side: str,
+    aura_key: str,
+    cards: dict[str, Card],
+) -> ChainLink:
+    """Cosmo ataca usando uma aura com ward que você controla.
+
+    Cosmo, Scroll of Ancestral Tapestry: enquanto Cosmo estiver equipado,
+    auras com ward que você controla são armas com poder base = ward e
+    'Once per Turn Action - 1 recurso: ataque'. Ataques de aura com contadores
+    +1 ganham Go Again.
+
+    - Aura atacada permanece em jogo (não vai à corrente nem ao cemitério).
+    - Enigma: o 1º ataque de Spectral Shield no turno custa 1 recurso a menos.
+    """
+    p = state.players[side]
+    if not any("Cosmo" in k for k in p.weapons):
+        raise CombatError("Cosmo, Scroll of Ancestral Tapestry não está equipado")
+    copies = p.auras.get(aura_key)
+    if not copies:
+        raise CombatError(f"{aura_key} não está em jogo")
+    if aura_key in p.weapon_attacks_this_turn:
+        raise CombatError(f"ataque de aura de {aura_key} já usado neste turno")
+
+    card = _require(cards, aura_key)
+    base = aura_base_ward(card)
+    if base <= 0:
+        raise CombatError(f"{card.name} não tem ward (não é arma do Cosmo)")
+
+    best = max(range(len(copies)), key=lambda i: copies[i])
+    counters = copies[best]
+    total = base + counters
+
+    cost = 1
+    if aura_key == SPECTRAL_SHIELD and p.spectral_attacks_this_turn == 0:
+        cost = 0
+    if p.pitch_pool < cost:
+        raise CombatError(f"recursos insuficientes ({p.pitch_pool} < {cost})")
+    p.pitch_pool -= cost
+
+    go_again = counters > 0
+    _use_ap(p, go_again)
+
+    p.weapon_attacks_this_turn.append(aura_key)
+    if aura_key == SPECTRAL_SHIELD:
+        p.spectral_attacks_this_turn += 1
+
+    link = ChainLink(attacker=side, card_key=aura_key, total_damage=total)
+    state.chain.append(link)
+    return link
 
 
 def spend_ward(state: GameState, defender_side: str, aura_key: str, needed: int) -> list[Notice]:
