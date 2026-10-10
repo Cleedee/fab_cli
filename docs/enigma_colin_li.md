@@ -51,9 +51,11 @@ Baseado em simulação de 20.000 primeiras mãos (pool de 44 cartas, mão de 4) 
 | Mão com **motor + ataque** jogável | **43%** |
 | Mão com **transcend + blue** | 26% |
 
-- **Keep** se tiver motor OU (2+ blues + ataque). Motor sem ataque ainda keep — o motor
-  gera os ataques do Cosmo.
-- **Mulligan** se mão só de support/custo alto sem blue (nada para gerar ataques de aura).
+- O FAB **não tem mulligan**: joga-se sempre a mão que comprar. Ela é boa quando tem
+  **motor** OU (2+ blues + ataque) — motor sem ataque já basta, pois o motor gera os
+  ataques do Cosmo.
+- Mão só de support/custo alto sem blue é a pior: priorize defender e estabilizar até
+  comprar um motor (guarde no arsenal a melhor jogada proativa do próximo turno).
 
 ### 2. Ordem do Turno 1
 
