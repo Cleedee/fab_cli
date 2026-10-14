@@ -48,6 +48,11 @@ def card_value(card: Card, w: ValueWeights = DEFAULT_WEIGHTS) -> float:
     if "Defense Reaction" in card.types:
         value += w.dr_bonus
     value += (card.pitch or 0) * w.pitch_weight
+    # Penaliza fortemente perder peças-chave do motor Enigma
+    if card.name in ("Spectral Manifestations", "Solitary Companion"):
+        value += 6.0
+    if card.name == "Astral Etchings":
+        value += 5.0
     return value
 
 

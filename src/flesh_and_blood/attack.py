@@ -431,13 +431,30 @@ def plan_enigma(
     def affordable(cost: int, exclude: str | None = None) -> bool:
         return pool >= cost or pool + pitchable_count(exclude) >= cost
 
+    def _pitch_preference(k: str) -> tuple:
+        c = hand[k]
+        is_def = ("Block" in c.types) or ("Defense Reaction" in c.types)
+        is_engine = (c.name == SPECTRAL_MANIFESTATIONS or c.name == SOLITARY_COMPANION)
+        is_charge = (c.name == ASTRAL_ETCHINGS)
+        is_attack = c.is_attack
+        # Pitch order: defense first (0), others middle (1), attacks middle-high (2),
+        # engine/charge LAST (3) to preserve them
+        if is_engine or is_charge:
+            pref = 3
+        elif is_attack:
+            pref = 2
+        elif is_def:
+            pref = 0
+        else:
+            pref = 1
+        return (pref, c.pitch or 0, c.name)
+
     def pay(cost: int) -> bool:
         nonlocal pool
         while pool < cost:
             if not unplayed:
                 return False
-            # picha a de menor pitch primeiro (preserva azuis para custos maiores)
-            k = min(unplayed, key=lambda k: (hand[k].pitch or 0, hand[k].name))
+            k = min(unplayed, key=_pitch_preference)
             if (hand[k].pitch or 0) <= 0:
                 return False
             if k not in plan.pitched:
