@@ -49,9 +49,10 @@ python scripts/build_cards.py --dataset-dir <caminho>/json/english
 | `carddb.py` | carrega `data/cards.yaml` |
 | `deck.py` | decklists YAML + validação Silver Age (pool=55, ≤2 cópias, classes do herói) |
 | `combat.py` | operações de turno/combate; prioridade (`give_priority`/`pass_priority`), `play_reaction`, `draw_from_deck`; valida e devolve `Notice`s (triggers manuais) |
-| `attack.py` | planejadores de turno: `plan_attack` (burst/lethal) e `plan_enigma` (Cosmo/auras) |
-| `defense.py` | sugeridor de defesa (usado pelo bot na defesa) |
-| `bot.py` | política automática: executa `plan_enigma`, defesa via `suggest_defense` |
+| `attack.py` | planejador genérico de turno: `plan_attack` (burst/lethal, multi-plan) |
+| `heroes/` | **estratégias por herói** (`HeroStrategy`, `TurnPlan`) e modelo de ameaça. Registry em `heroes/__init__.py` (`strategy_for`). Módulos: `base.py`, `generic.py`, `enigma.py` (`plan_enigma`/Cosmo), `bravo.py` (crush), `matchups.py` (`phantasm_risk`/`opponent_threat`). Ver `docs/plano_arquitetura_herois.md` |
+| `defense.py` | sugeridor de defesa hero-agnóstico (`value_bonus` injetado pela estratégia) |
+| `bot.py` | política automática: despacha por `strategy_for(hero)` e executa o `TurnPlan`; defesa via `suggest_defense` |
 | `setup.py` | auto_setup (monta mão inicial, arsenal e `PlayerState.deck` restante) |
 | `cli.py` | ponto de entrada (TUI textual) |
 
@@ -176,3 +177,11 @@ Scripts auxiliares:
       corrente), AVISO fora da prioridade, `draw` regrado (topo de
       `PlayerState.deck`), comando `deck <a|b> <arquivo>`, save/load preserva
       prioridade
+- [x] Fase 6 — arquitetura por herói + matchup (292 testes): pacote `heroes/`
+      (`HeroStrategy`/`TurnPlan`, registry `strategy_for`); `plan_enigma` movido
+      para `heroes/enigma.py` (`attack.py` fica genérico); `defense.py`
+      hero-agnóstico (`value_bonus`); `bot.py` com executor unificado de
+      `TurnPlan`; modelo de ameaça do Bravo (`heroes/bravo.py`: `crush_threat`)
+      e risco de Phantasm (`heroes/matchups.py`) usados pelo `plan_enigma`;
+      `docs/plano_arquitetura_herois.md`, `docs/enigma_vs_bravo.md`,
+      `docs/bravo_flattering_showman.md`, `scripts/sim_enigma_vs_bravo.py`
