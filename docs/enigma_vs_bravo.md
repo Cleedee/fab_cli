@@ -20,9 +20,10 @@ com Dominate** que dispara um efeito de crush (disrupção). Enigma precisa
 ### Por que ward responde ao Dominate
 
 `Dominate` (CR 8.3.4) = "não pode ser defendido por mais de **uma carta da
-mão**". Ward **não defende com carta da mão**: destruir a aura previne dano = ward
-+ contadores. Então a aura carregada atravessa o Dominate. É o principal
-"escudo" do Enigma contra o turno de crush.
+mão**". Ward **não defende com carta da mão**: destruir a aura previne o **ward
+base** (CR 8.3.20 — os contadores `+1{p}` **não** somam, servem só para o
+ataque). Cada aura destruída previne 1 e não é carta da mão, então **atravessa
+o Dominate**. É o principal "escudo" do Enigma contra o turno de crush.
 
 ## Os 4 problemas que o Bravo causa (e como responder)
 
@@ -42,7 +43,7 @@ Nenhum desses danos é arcano — **Nullrune é peso morto neste matchup**.
 Você só pode usar **1 carta da mão**. Some tudo o mais:
 
 ```
-10 (ataque) - [1 carta da mão] - [equipamento] - [prevenção/ward] <= 3  -> crush não dispara
+10 (ataque) - [1 carta da mão] - [equipamento] - [prevenção] - [nº de shields destruídos] <= 3  -> crush não dispara
 ```
 
 Fontes:
@@ -50,8 +51,10 @@ Fontes:
   `Big Blue Sky` (2{d}+1 por blue pitchado), attack actions (3{d}).
 - **Equipamento:** `Blade Beckoner Plating`/`Helm` (1{d} cada),
   `Unyielding Grip` (+3{d} se mão vazia).
-- **Ward:** destruir a aura previne ward+contadores. Spectral Shield do motor
-  chega a **ward 4-7** (Manifestations +3, Etchings +3).
+- **Ward:** cada aura destruída previne **1** (o ward base — CR 8.3.20). Os
+  contadores `+1{p}` (Manifestations +3, Etchings +3) aumentam o **ataque** do
+  Cosmo, **não** a prevenção. Logo, ward = `nº de shields destruídos × 1` —
+  acumule shields turno a turno.
 - **Prevenção:** `Moon Chakra` (3, ou **5** se transcendeu), `Oasis Respite` (4).
 
 **Truque central — `Unflinching Foothold`:** `Instant - Destroy: target attack
@@ -70,9 +73,9 @@ de crush, não gaste como bloco comum.
 - **Motor Cosmo é imune a Phantasm:** ataques de aura (Spectral Shield etc.)
   não são attack action cards. São a sua pressão confiável — e com +1 contador
   ganham **go again**.
-- **Linha de dano ideal t1-t2:** `Spectral Manifestations` (shield ward 4) →
-  Cosmo ataca 4{p} + go again → `Fluid Motion`/`Second Tenet`/`Clear Conscience`.
-  Alvo: **6-8 dano/turno**.
+- **Linha de dano ideal t1-t2:** `Spectral Manifestations` (shield com 3
+  contadores) → Cosmo ataca 4{p} + go again → `Fluid Motion`/`Second Tenet`/
+  `Clear Conscience`. Alvo: **6-8 dano/turno**.
 
 ## Plano por fase
 
@@ -106,7 +109,7 @@ de crush, não gaste como bloco comum.
 | Peito | `Blade Beckoner Plating` | 1{d} vs weapon. |
 | Braços | `Unyielding Grip` | +3{d} com mão vazia (pós-ataque). |
 | Pernas | **`Unflinching Foothold`** | **Anti-Dominate** — a peça-chave da matchup. |
-| Extra | `Skycrest Keikoi`, `Uphold Tradition` | Prevenção 1 / +1 contador em ward. |
+| Extra | `Skycrest Keikoi`, `Uphold Tradition` | Prevenção 1 / põe +1{p} num aura ward (ataque). |
 
 ## Checklist rápido
 

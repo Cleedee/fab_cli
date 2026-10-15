@@ -72,9 +72,9 @@ def test_cosmo_requer_equipamento(state, cards):
         cmb.attack_with_aura(state, "B", "Spectral Shield", cards)
 
 
-def test_cosmo_dano_igual_ward_e_aura_permanece(state, cards):
+def test_cosmo_dano_igual_ward_mais_contadores_e_aura_permanece(state, cards):
     pb = state.players["B"]
-    pb.add_aura("Spectral Shield", 3)  # ward 4 (1 base + 3)
+    pb.add_aura("Spectral Shield", 3)  # ataque 4 (ward 1 + 3 contadores +1{p})
     link = cmb.attack_with_aura(state, "B", "Spectral Shield", cards)
     assert link.total_damage == 4
     assert state.players["A"].life == 20
@@ -86,7 +86,7 @@ def test_cosmo_dano_igual_ward_e_aura_permanece(state, cards):
 
 def test_cosmo_primeiro_ataque_spectral_custa_zero(state, cards):
     pb = state.players["B"]
-    pb.add_aura("Spectral Shield", 0)  # ward 1
+    pb.add_aura("Spectral Shield", 0)  # ataque 1 (sem contadores)
     pb.pitch_pool = 1
     cmb.attack_with_aura(state, "B", "Spectral Shield", cards)
     assert pb.pitch_pool == 1  # desconto do Enigma no 1º ataque
@@ -111,7 +111,7 @@ def test_cosmo_uma_vez_por_turno_por_aura(state, cards):
 # ── motor: Spectral Manifestations / Solitary Companion ──────────────────
 
 
-def test_manifestations_cria_shield_ward4(state, cards):
+def test_manifestations_cria_shield_com_3_contadores(state, cards):
     pb = state.players["B"]
     pb.hand = ["Spectral Manifestations (red)"]
     pb.pitch_pool = 2
@@ -119,6 +119,22 @@ def test_manifestations_cria_shield_ward4(state, cards):
     assert pb.auras["Spectral Shield"] == [3]
     assert pb.action_points == 1  # Go Again da carta
     assert pb.pitch_pool == 0
+
+
+@pytest.mark.parametrize(
+    ("card_key", "expected"),
+    [
+        ("Spectral Manifestations (red)", 3),
+        ("Spectral Manifestations (yellow)", 2),
+        ("Spectral Manifestations (blue)", 1),
+    ],
+)
+def test_manifestations_contadores_por_cor(state, cards, card_key, expected):
+    pb = state.players["B"]
+    pb.hand = [card_key]
+    pb.pitch_pool = 2
+    cmb.play_aura_engine(state, "B", card_key, cards)
+    assert pb.auras["Spectral Shield"] == [expected]
 
 
 def test_solitary_cria_aura_e_shield(state, cards):
@@ -147,7 +163,7 @@ def test_astral_charge_como_instant_quando_tem_shield(state, cards):
 def test_astral_charge_como_action_sem_shield(state, cards):
     pb = state.players["B"]
     pb.hand = ["Astral Etchings (red)"]
-    pb.add_aura("Waxing Specter (red)", 1)  # ward 3 + 1
+    pb.add_aura("Waxing Specter (red)", 1)  # ataque 4 (ward 3 + 1 contador)
     pb.pitch_pool = 1
     ap_before = pb.action_points
     cmb.astral_charge(state, "B", cards)

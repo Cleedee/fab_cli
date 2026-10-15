@@ -15,6 +15,9 @@ EMBODIMENT_EARTH = "Embodiment of Earth"
 EMBODIMENT_LIGHTNING = "Embodiment of Lightning"
 SPECTRAL_SHIELD = "Spectral Shield"
 
+# Spectral Manifestations: nº de +1{p} contadores por cor (red=3, yellow=2, blue=1).
+MANIFESTATIONS_COUNTERS: dict[Color, int] = {Color.RED: 3, Color.YELLOW: 2, Color.BLUE: 1}
+
 # Heróis com a passiva watery grave (jogar cartas do cemitério).
 GRAVY_BONES_HEROES: frozenset[str] = frozenset({"Gravy Bones", "Gravy Bones, Shipwrecked Looter"})
 
@@ -595,7 +598,9 @@ def play_aura_engine(
     """Joga o motor de auras do Enigma: Spectral Manifestations ou Solitary Companion.
 
     - Spectral Manifestations: custo 2, Go Again; cria Spectral Shield e, se não
-      controla outras auras Illusionist, com +3 contadores (Ward 4).
+      controla outras auras Illusionist, com +1{p} contadores conforme a cor
+      (red=3, yellow=2, blue=1). O ward segue 1; os contadores só aumentam o
+      ataque do Cosmo.
     - Solitary Companion: custo 0; entra como aura Ward 3 e cria Spectral Shield
       se não controla outras auras Illusionist.
     """
@@ -607,10 +612,17 @@ def play_aura_engine(
     go_again = name == "Spectral Manifestations"
     notices = play_action(state, side, card_key, cards, go_again_earned=go_again)
     if name == "Spectral Manifestations":
-        counters = 3 if not _has_other_illusionist_aura(p, cards, card_key) else 0
+        counters = 0
+        if not _has_other_illusionist_aura(p, cards, card_key):
+            counters = MANIFESTATIONS_COUNTERS.get(card.color, 0)
         p.add_aura(SPECTRAL_SHIELD, counters)
         if counters:
-            notices.append(Notice("Spectral Shield criado com +3 contadores (Ward 4)."))
+            notices.append(
+                Notice(
+                    f"Spectral Shield criado com +{counters} contadores "
+                    f"(ataque Cosmo {1 + counters}{{p}})."
+                )
+            )
         else:
             notices.append(Notice("Spectral Shield criado (Ward 1, sem o bônus)."))
     else:
@@ -627,7 +639,7 @@ def astral_charge(state: GameState, side: str, cards: dict[str, Card]) -> list[N
 
     Se você controla um Spectral Shield, a carta é jogada como instant (sem
     custo de AP); senão é uma action (gasta 1 AP). O alvo é a aura com ward de
-    maior total (a que agrega mais dano/defesa).
+    maior PODER (ward base + contadores), para ampliar o ataque do Cosmo.
     """
     p = state.players[side]
     candidates = [k for k in p.hand if cards.get(k) and "Astral Etchings" in cards[k].name]
@@ -642,7 +654,7 @@ def astral_charge(state: GameState, side: str, cards: dict[str, Card]) -> list[N
     targets = [k for k in p.auras if aura_base_ward(cards.get(k)) > 0]
     if not targets:
         raise CombatError("nenhuma aura com ward para receber os contadores")
-    target = max(targets, key=lambda k: ward_value(p, k))
+    target = max(targets, key=lambda k: aura_attack_power(p, k, cards[k]))
     copies = p.auras[target]
     idx = max(range(len(copies)), key=lambda i: copies[i])
     copies[idx] += 3
@@ -902,11 +914,6 @@ def use_equipment_defense(
 # ---------------------------------------------------------------------------
 
 
-def ward_value(player: PlayerState, aura_key: str) -> int:
-    """Ward total somando todas as cópias da aura (1 + contadores cada)."""
-    return sum(1 + counters for counters in player.auras.get(aura_key, []))
-
-
 def aura_base_ward(card: Card) -> int:
     """Ward base da carta a partir da keyword (ex.: 'Ward 3' -> 3)."""
     for kw in card.keywords:
@@ -915,6 +922,30 @@ def aura_base_ward(card: Card) -> int:
             if digits.isdigit():
                 return int(digits)
     return 0
+
+
+def ward_value(player: PlayerState, aura_key: str, card: Card) -> int:
+    """Dano total que destruir TODAS as cópias desta aura previne.
+
+    CR 8.3.20: 'Ward N' fixo — destruir a aura previne N. Os contadores +1{p}
+    NÃO aumentam a prevenção; eles só alimentam o ataque (ver
+    `aura_attack_power`). Ex.: Spectral Shield (Ward 1) com 3 contadores
+    previne 1 por cópia, não 4.
+    """
+    return len(player.auras.get(aura_key, [])) * aura_base_ward(card)
+
+
+def aura_attack_power(player: PlayerState, aura_key: str, card: Card) -> int:
+    """Poder do ataque de aura via Cosmo: ward base + contadores da melhor cópia.
+
+    Cosmo: 'auras com ward são armas com base {p} igual ao ward' e os
+    contadores +1{p} somam ao poder (e dão Go Again). Aqui sim os contadores
+    contam.
+    """
+    copies = player.auras.get(aura_key)
+    if not copies:
+        return 0
+    return aura_base_ward(card) + max(copies)
 
 
 def activate_hero_ability(state: GameState, side: str, cards: dict[str, Card]) -> Notice:
@@ -990,28 +1021,40 @@ def attack_with_aura(
     return link
 
 
-def spend_ward(state: GameState, defender_side: str, aura_key: str, needed: int) -> list[Notice]:
-    """Destrói cópias da aura (maior contador primeiro) prevenindo até 'needed'.
+def spend_ward(
+    state: GameState,
+    defender_side: str,
+    aura_key: str,
+    needed: int,
+    cards: dict[str, Card],
+) -> list[Notice]:
+    """Destrói cópias da aura prevenindo até 'needed' (CR 8.3.20: Ward N fixo).
 
+    Cada cópia destruída previne o ward BASE da carta (Spectral Shield = 1),
+    independente dos contadores +1{p} — eles só alimentam o ataque de Cosmo.
+    Por isso destrói-se primeiro a cópia com MENOS contadores (a mais barata),
+    preservando as de maior poder para o ataque.
     Tokens como Spectral Shield somem; auras de carta vão para o graveyard.
-    O valor prevenido deve ser descontado manualmente em resolve_link
+    O valor prevenido é descontado manualmente em resolve_link
     (ward_prevented), mantendo o fluxo explícito para o jogador.
     """
     notices: list[Notice] = []
     defender = state.players[defender_side]
+    base = aura_base_ward(_require(cards, aura_key))
+    if base <= 0:
+        raise CombatError(f"{aura_key} não tem ward (não pode prevenir dano)")
+    label = "Spectral Shield" if aura_key == SPECTRAL_SHIELD else aura_key
     prevented = 0
     while prevented < needed and defender.auras.get(aura_key):
         copies = defender.auras[aura_key]
-        best = max(range(len(copies)), key=lambda i: copies[i])
-        counters = defender.pop_aura(aura_key, best)
+        weakest = min(range(len(copies)), key=lambda i: copies[i])
+        counters = defender.pop_aura(aura_key, weakest)
         assert counters is not None
-        value = 1 + counters
-        prevented += value
-        if aura_key == SPECTRAL_SHIELD:
-            notices.append(Notice(f"Spectral Shield (+{counters}) destruído: previne {value}."))
-        else:
+        prevented += base
+        if aura_key != SPECTRAL_SHIELD:
             defender.graveyard.append(aura_key)
-            notices.append(Notice(f"{aura_key} (+{counters}) destruído: previne {value}."))
+        extra = f" e perde {counters} contador +1{{p}}" if counters else ""
+        notices.append(Notice(f"{label} destruída (Ward {base}): previne {base}{extra}."))
     return notices
 
 

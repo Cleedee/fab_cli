@@ -3,6 +3,7 @@ import pytest
 from flesh_and_blood.carddb import load_cards
 from flesh_and_blood.combat import (
     CombatError,
+    aura_attack_power,
     boost_link,
     deal_arcane,
     declare_attack,
@@ -261,15 +262,30 @@ def test_stinging_sprite_defending_pings_arcane(state, cards):
 
 def test_spectral_shield_ward_prevents_and_token_vanishes(state, cards):
     b = state.players["B"]
-    b.add_aura("Spectral Shield", counters=1)  # ward 2
-    assert ward_value(b, "Spectral Shield") == 2
+    b.add_aura("Spectral Shield", counters=3)  # Ward 1 fixo; contadores são +1{p}
+    shield = cards["Spectral Shield"]
+    # CR 8.3.20: contadores NÃO aumentam a prevenção (só alimentam o ataque).
+    assert ward_value(b, "Spectral Shield", shield) == 1
+    assert aura_attack_power(b, "Spectral Shield", shield) == 4  # 1 + 3
     declare_attack(state, "A", "Arcanic Shockwave (red)", cards)  # 4
-    notices = spend_ward(state, "B", "Spectral Shield", needed=4)
-    assert any("previne 2" in n.text for n in notices)
-    result = resolve_link(state, cards, ward_prevented=2)
-    assert result["physical"] == 2
-    assert b.life == 18
+    notices = spend_ward(state, "B", "Spectral Shield", needed=4, cards=cards)
+    assert any("previne 1" in n.text for n in notices)
+    result = resolve_link(state, cards, ward_prevented=1)
+    assert result["physical"] == 3
+    assert b.life == 17
     assert b.auras.get("Spectral Shield") is None
+
+
+def test_ward_destruir_prefere_copia_mais_barata(state, cards):
+    b = state.players["B"]
+    b.add_aura("Spectral Shield", counters=5)  # cara: vale para o ataque
+    b.add_aura("Spectral Shield", counters=0)  # barata: sacrifica primeiro
+    shield = cards["Spectral Shield"]
+    assert ward_value(b, "Spectral Shield", shield) == 2
+    notices = spend_ward(state, "B", "Spectral Shield", needed=1, cards=cards)
+    assert any("previne 1" in n.text for n in notices)
+    # preserva a cópia de 5 contadores (maior poder de ataque do Cosmo)
+    assert b.auras["Spectral Shield"] == [5]
 
 
 def test_arcane_bypasses_block_but_barrier_helps(state, cards):

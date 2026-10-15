@@ -13,7 +13,9 @@ Combo aggro de auras 2H **Cosmo**:
 - `Cosmo, Scroll of Ancestral Tapestry` — auras com ward viram armas (p = ward) com
   "Once per Turn Action - {r}: Attack"; ataques de aura com +1 contadores ganham Go Again.
 - `Spectral Manifestations` (2{r}, Go Again) — cria Spectral Shield e, se controlar
-  **nenhuma outra** aura Illusionist, põe 3 contadores no token (shield ward 4 = ataque 4).
+  **nenhuma outra** aura Illusionist, põe 3 contadores no token (ward segue **1**;
+  o Cosmo ataca 1+3 = **4{p}**). Contadores `+1{p}` valem para o **ataque**, não
+  para a prevenção do ward.
 - `Solitary Companion` (0{r}) — mesma condição, cria shield.
 - `Astral Etchings` — +3 contadores em aura ward (instant se controlar shield).
 
@@ -62,7 +64,7 @@ Baseado em simulação de 20.000 primeiras mãos (pool de 44 cartas, mão de 4) 
 **Regra de ouro: jogue a 1ª aura/charge INTO o shield antes de qualquer outra coisa.**
 
 - `Spectral Manifestations` atrás de **nenhuma outra** aura Illusionist → shield ganha
-  **+3 contadores** (ward 4 → ataque Cosmo 4{p} + Go Again). Jogar outra aura antes
+  **+3 contadores** (Cosmo ataca 4{p} + Go Again). Jogar outra aura antes
   desperdiça o bônus.
 - `Solitary Companion` (0{r}) cria shield; só tem esse efeito sem outras auras.
 
@@ -81,13 +83,13 @@ Baseado em simulação de 20.000 primeiras mãos (pool de 44 cartas, mão de 4) 
 **Mão A:** `Solitary Companion + Spectral Manifestations + Fluid Motion + Second Tenet Tide`
 
 1. Pitch `Second Tenet Tide` → 3 resfr
-2. `Spectral Manifestations` (2{r}) → shield com 3 contadores (ward 4)
+2. `Spectral Manifestations` (2{r}) → shield com 3 contadores (Cosmo 4{p})
 3. Não jogar Solitary (o bônus do Manifestations já foi usado; guardar Solitary para
    bloqueio 2{d} ou turno 2)
 4. Cosmo ataca shield 4{p} → Go Again (aura com contadores)
 5. `Fluid Motion` 0{r} (2{p}, Go Again se criou card neste turno) → atropela
 
-Linha t1: **~6-7 dano + shield ward 4 na mesa.**
+Linha t1: **~6-7 dano + shield com 3 contadores na mesa.**
 
 **Mão B:** `Waxing Specter + Test of Strength + Clear Conscience + Oasis Respite`
 

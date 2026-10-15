@@ -100,8 +100,10 @@ Scripts auxiliares:
 - Ativa (once per turn instant): cria token Spectral Shield com contador +1.
 - Cosmo, Scroll of Ancestral Tapestry: ataca USANDO uma aura com ward (dano = ward +
   contadores; custo {r} por ataque).
-- Ward: destruir a aura previne dano igual a ward+contadores; tokens somem,
-  auras de carta vão ao graveyard. Escolhe-se a cópia de maior contador primeiro.
+- Ward: destruir a aura previne dano igual ao ward **base** (CR 8.3.20; os
+  contadores +1{p} **não** aumentam a prevenção — só alimentam o ataque de
+  Cosmo); tokens somem, auras de carta vão ao graveyard. Prefere-se destruir a
+  cópia de **menor** contador (preserva o poder do ataque).
 
 ### Regras mecânicas implementadas em `combat.py`
 - Action points: toda action (incl. arma, "Once per Turn Action") gasta 1 AP;

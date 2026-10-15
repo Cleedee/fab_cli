@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from flesh_and_blood import combat
 from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.combat import aura_attack_power, spend_ward, ward_value
 from flesh_and_blood.defense import suggest_defense
 from flesh_and_blood.heroes import crush_threat, plan_enigma, strategy_for, ward_base
 from flesh_and_blood.models import Hero, new_game
@@ -141,19 +142,32 @@ def scenario_enigma_turn(cards):
 
 def scenario_ward_math(cards):
     print("=" * 72)
-    print("C) MATEMÁTICA DO WARD contra o crush (10{p})")
+    print("C) WARD: prevenção (destaque) vs poder de ataque (contadores)")
     print("=" * 72)
-    print("Ward previne dano quando a aura é destruída = ward base + contadores.")
-    for base, counters in ((1, 0), (1, 3), (3, 1)):
-        print(
-            f"    Spectral Shield base {base} + {counters} contadores -> previne {base + counters}"
-        )
-    print()
+    print("CR 8.3.20: destruir a aura previne o ward BASE. Contadores +1{p}")
+    print("NÃO aumentam a prevenção — só o ataque do Cosmo (base + contadores).")
     shield = cards["Spectral Shield"]
-    print(f"    (token Spectral Shield: ward base {ward_base(shield)})")
+    print(f"\n    Spectral Shield: ward base {ward_base(shield)} (CR 8.3.21).")
+
+    state = make_state()
+    a = state.players["A"]
+    a.add_aura("Spectral Shield", counters=5)  # cara: vale para o ataque
+    a.add_aura("Spectral Shield", counters=0)  # barata: sacrifica primeiro
+    prevention = ward_value(a, "Spectral Shield", shield)
+    attack = aura_attack_power(a, "Spectral Shield", shield)
+    print(
+        f"    2 shields -> ward_value = {prevention} (preventável); "
+        f"ataque do Cosmo = {attack}{{p}}."
+    )
+    notices = spend_ward(state, "A", "Spectral Shield", needed=1, cards=cards)
+    for n in notices:
+        print(f"      {n.text}")
+    print(f"    cópia preservada para o ataque: {a.auras['Spectral Shield']}")
+    print("    => Prevenção = nº de auras destruídas x 1; acumule shields.")
+    print()
     example = [
         "10 (crush) - 4 (Test of Strength) - 1 (Helm) - 1 (Plating) = 4 -> crush DISPARA",
-        "10 (crush) - 4 (Test of Strength) - 4 (shield carregado) = 2 -> crush desligado",
+        "10 (crush) - 4 (Test of Strength) - 4 (4 shields destruídos) = 2 -> crush desligado",
         "10 (crush) - 4 (Test of Strength) - 1 (equip) - 5 (Moon Chakra transcendido) = 0",
     ]
     print("    Exemplos de linha (Dominate: só 1 carta da mão):")
