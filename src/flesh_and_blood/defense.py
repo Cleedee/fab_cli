@@ -6,10 +6,14 @@ opções por (dano sofrido, valor perdido, nº de cartas). O valor de mão é
 uma heurística configurável — não é verdade de mesa.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from itertools import combinations
 
 from flesh_and_blood.models import Card
+
+# Função de valor de uma carta na mão (genérico + bônus específico do herói).
+CardValueFn = Callable[[Card], float]
 
 MAX_ENUM_CARDS = 10
 EQUIPMENT_USE_COST = 0.25
@@ -34,6 +38,10 @@ DEFAULT_WEIGHTS = ValueWeights()
 def card_value(card: Card, w: ValueWeights = DEFAULT_WEIGHTS) -> float:
     """Valor heurístico de manter a carta na mão (quanto maior, menos queremos gastar).
 
+    Genérico e agnóstico de herói. O custo de oportunidade específico do herói
+    (ex.: peças de motor do Enigma) entra via ``value_bonus`` em
+    ``suggest_defense`` — ver ``heroes.HeroStrategy.hand_value_bonus``.
+
     Pitch (ciclo de recurso) é o maior custo de oportunidade: uma carta azul
     (pitch 3) custa 3x mais recursos do que uma vermelha (pitch 1). O peso
     ``pitch_weight`` controla quanto essa diferença impacta no valor.
@@ -48,11 +56,6 @@ def card_value(card: Card, w: ValueWeights = DEFAULT_WEIGHTS) -> float:
     if "Defense Reaction" in card.types:
         value += w.dr_bonus
     value += (card.pitch or 0) * w.pitch_weight
-    # Penaliza fortemente perder peças-chave do motor Enigma
-    if card.name in ("Spectral Manifestations", "Solitary Companion"):
-        value += 6.0
-    if card.name == "Astral Etchings":
-        value += 5.0
     return value
 
 
@@ -108,17 +111,18 @@ def _enumerate_hand(
     hand: dict[str, Card],
     incoming: int,
     dominate: bool,
-    weights: ValueWeights,
+    value_fn: CardValueFn,
     *,
     earth_bonus: bool = False,
 ) -> list[tuple[tuple[str, ...], int, float]]:
     """Retorna [(subset, bloqueio, valor perdido)] viáveis para a mão.
 
-    `earth_bonus`: se True, non-attack actions recebem +1{d} (Embodiment of Earth).
+    `value_fn` calcula o custo de oportunidade de cada carta (já inclui bônus
+    específico do herói). `earth_bonus`: non-attack actions recebem +1{d}.
     """
     keys = list(hand)
     if len(keys) > MAX_ENUM_CARDS:
-        return _greedy_hand(hand, incoming, weights)
+        return _greedy_hand(hand, incoming, value_fn)
     out = []
     for size in range(len(keys) + 1):
         for subset in combinations(keys, size):
@@ -128,7 +132,7 @@ def _enumerate_hand(
                 if earth_bonus and hand[k].is_non_attack_action:
                     d += 1
                 block += d
-            lost = sum(card_value(hand[k], weights) for k in subset)
+            lost = sum(value_fn(hand[k]) for k in subset)
             if dominate and not _dominate_ok([(k, "Action" in hand[k].types) for k in subset]):
                 continue
             out.append((subset, block, lost))
@@ -136,17 +140,17 @@ def _enumerate_hand(
 
 
 def _greedy_hand(
-    hand: dict[str, Card], incoming: int, weights: ValueWeights
+    hand: dict[str, Card], incoming: int, value_fn: CardValueFn
 ) -> list[tuple[tuple[str, ...], int, float]]:
     """Fallback para mãos grandes: bloqueia do menor custo-benefício ao maior."""
-    ranked = sorted(hand, key=lambda k: card_value(hand[k], weights) / max(1, hand[k].defense or 0))
+    ranked = sorted(hand, key=lambda k: value_fn(hand[k]) / max(1, hand[k].defense or 0))
     chosen: list[str] = []
     for key in ranked:
         if sum(hand[k].defense or 0 for k in chosen) >= incoming:
             break
         chosen.append(key)
     block = sum(hand[k].defense or 0 for k in chosen)
-    lost = sum(card_value(hand[k], weights) for k in chosen)
+    lost = sum(value_fn(hand[k]) for k in chosen)
     return [((), 0, 0.0), (tuple(chosen), block, lost)]
 
 
@@ -159,6 +163,7 @@ def suggest_defense(
     top: int = 3,
     weights: ValueWeights = DEFAULT_WEIGHTS,
     earth_bonus: bool = False,
+    value_bonus: CardValueFn | None = None,
 ) -> list[DefenseOption]:
     """Sugere linhas de defesa ordenadas da melhor para a pior.
 
@@ -166,8 +171,14 @@ def suggest_defense(
     - `equipment_defense`: defesa ainda disponível por equipamento (uso "grátis",
       mas com microcusto para não desperdiçar a once-per-turn sem necessidade).
     - `earth_bonus`: se True, non-attack actions defendem com +1{d} (Embodiment of Earth).
+    - `value_bonus`: bônus de valor específico do herói (ex.: peças de motor).
     - Sempre inclui a opção de não bloquear; nunca levanta erro por falta de opção.
     """
+
+    def value_fn(card: Card) -> float:
+        base = card_value(card, weights)
+        return base + value_bonus(card) if value_bonus is not None else base
+
     equip = dict(equipment_defense or {})
     equip_options = [()]
     if equip:
@@ -179,7 +190,7 @@ def suggest_defense(
     options: list[DefenseOption] = []
     hand_set = set(hand)
     for hand_subset, hand_block, hand_lost in _enumerate_hand(
-        hand, incoming_damage, dominate, weights, earth_bonus=earth_bonus
+        hand, incoming_damage, dominate, value_fn, earth_bonus=earth_bonus
     ):
         used = set(hand_subset)
         remaining_keys = hand_set - used

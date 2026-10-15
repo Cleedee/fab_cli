@@ -19,7 +19,6 @@ from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Header, Input, ListItem, ListView, RichLog, Static
 
-from flesh_and_blood import attack as atk
 from flesh_and_blood import bot as bt
 from flesh_and_blood import combat as cmb
 from flesh_and_blood import deck as dk
@@ -28,6 +27,7 @@ from flesh_and_blood import probabilities as prob
 from flesh_and_blood import recorder as rec
 from flesh_and_blood import review as rvw
 from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.heroes import strategy_for
 from flesh_and_blood.models import (
     Card,
     GameState,
@@ -136,8 +136,8 @@ def _parse_grave_source(args: list[str]) -> tuple[str, list[str]]:
     return source, rest
 
 
-def _enigma_step_label(step: tuple, cards: dict[str, Card]) -> str:
-    """Formata um step do plano Enigma para exibição."""
+def _plan_step_label(step: tuple, cards: dict[str, Card]) -> str:
+    """Formata um step de ``TurnPlan`` para exibição."""
     kind = step[0]
     key = step[1] if len(step) > 1 else None
     if kind == "pitch":
@@ -150,6 +150,8 @@ def _enigma_step_label(step: tuple, cards: dict[str, Card]) -> str:
         return f"Cosmo ataca com a aura {key}"
     if kind == "attack":
         return f"Ataque de {cards[key].name}"
+    if kind == "weapon":
+        return f"Atacar com a arma {cards[key].name}"
     if kind == "resolve":
         return "Resolver corrente"
     return f"{kind} {key or ''}".strip()
@@ -1543,42 +1545,18 @@ class FaBApp(App[None]):
         """plan — mostra sugestão de linha de ataque."""
         side = self.game_state.active_player
         me = self.game_state.players[side]
-        weapon_key = me.weapons[0] if me.weapons else None
         opp = self.game_state.opponent_of(side)
         opp_life = self.game_state.players[opp].life
 
-        if me.hero_key == "Enigma":
-            plan = atk.plan_enigma(
-                self.game_state,
-                side,
-                self.cards,
-                opponent_life=opp_life,
-            )
-            self._log_notice(
-                f"[bold cyan]📋 Plano do Enigma (Cosmo/auras):[/] {self.matchup.label(side)} "
-                f"(AP {me.action_points}, pool {me.pitch_pool}{{r}})"
-            )
-            for step in plan.steps:
-                self._log_notice(f"  • {_enigma_step_label(step, self.cards)}")
-            self._log_notice(
-                f"  Dano estimado: {plan.physical}  "
-                f"Letal: {'[red]SIM[/]' if plan.lethal else '[green]não[/]'}"
-            )
-            if plan.pitched:
-                self._log_notice(f"  Pitch: {', '.join(plan.pitched)}")
-            for n in plan.notes:
-                self._log_notice(f"  [dim]• {n}[/]")
-            return
-
-        plan = atk.plan_attack(
+        strategy = strategy_for(me.hero_key)
+        plan = strategy.plan_turn(
             self.game_state,
             side,
             self.cards,
             opponent_life=opp_life,
-            weapon_key=weapon_key,
         )
         self._log_notice(
-            f"[bold cyan]📋 Plano de ataque:[/] {self.matchup.label(side)} "
+            f"[bold cyan]📋 Plano ({strategy.label}):[/] {self.matchup.label(side)} "
             f"(AP {me.action_points}, pool {me.pitch_pool}{{r}})"
         )
         if me.action_points <= 0:
@@ -1586,8 +1564,9 @@ class FaBApp(App[None]):
                 "[yellow]  Sem action points — use [bold]next[/] para virar o turno "
                 "ou [bold]switch[/] para o outro lado.[/]"
             )
-        if plan.sequence:
-            self._log_notice(f"  Sequência: {' → '.join(plan.sequence)}")
+        if plan.steps:
+            for step in plan.steps:
+                self._log_notice(f"  • {_plan_step_label(step, self.cards)}")
         else:
             self._log_notice("  [dim]Nenhuma carta para jogar.[/]")
         self._log_notice(
@@ -1621,6 +1600,7 @@ class FaBApp(App[None]):
         }
 
         earth_bonus = bool(p.auras.get(cmb.EMBODIMENT_EARTH))
+        strategy = strategy_for(p.hero_key)
         opts = dfs.suggest_defense(
             link.damage_remaining,
             hand,
@@ -1628,6 +1608,7 @@ class FaBApp(App[None]):
             dominate=link.dominate,
             top=3,
             earth_bonus=earth_bonus,
+            value_bonus=strategy.hand_value_bonus,
         )
         self._log_notice("[bold yellow]🛡 Sugestões de defesa:[/]")
         for i, opt in enumerate(opts, 1):

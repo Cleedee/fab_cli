@@ -23,10 +23,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from flesh_and_blood import combat
-from flesh_and_blood.attack import plan_enigma
 from flesh_and_blood.bot import run_bot_turn
 from flesh_and_blood.carddb import load_cards
 from flesh_and_blood.defense import suggest_defense
+from flesh_and_blood.heroes import plan_enigma
 from flesh_and_blood.models import ChainLink, Hero, new_game
 
 ENIGMA_EQUIPMENT = [
@@ -40,10 +40,17 @@ COSMO = "Cosmo, Scroll of Ancestral Tapestry"
 
 def make_state():
     """Estado base: Enigma (A) vs Boltyn (B), equipamento e arma do Enigma."""
-    enigma = Hero(key="Enigma", name="Enigma", life=20, intellect=4,
-                  classes=("Illusionist",), talents=("Mystic",))
-    boltyn = Hero(key="Boltyn", name="Boltyn", life=20, intellect=4,
-                  classes=("Light", "Warrior"), talents=())
+    enigma = Hero(
+        key="Enigma",
+        name="Enigma",
+        life=20,
+        intellect=4,
+        classes=("Illusionist",),
+        talents=("Mystic",),
+    )
+    boltyn = Hero(
+        key="Boltyn", name="Boltyn", life=20, intellect=4, classes=("Light", "Warrior"), talents=()
+    )
     state = new_game(enigma, boltyn, first_player="A")
     a = state.players["A"]
     a.weapons = [COSMO]
@@ -74,8 +81,7 @@ def scenario_boltyn_turn(cards):
     print("Mão da Enigma:", ", ".join(a.hand))
     print()
 
-    wave = [("Valiant Thrust (red)", 7), ("Take Flight (red)", 4),
-            ("Raydn, Duskbane", 3)]
+    wave = [("Valiant Thrust (red)", 7), ("Take Flight (red)", 4), ("Raydn, Duskbane", 3)]
     for name, power in wave:
         hand = {k: cards[k] for k in a.hand if k in cards}
         equip = {
@@ -89,26 +95,31 @@ def scenario_boltyn_turn(cards):
         options = suggest_defense(power, hand, equip, top=3)
         print(f"{name} ({power}p) — opções do sugeridor:")
         for opt in options:
-            print(f"    defesa {opt.block_total}: cartas={list(opt.hand_cards)}, "
-                  f"equip={list(opt.equipment)}")
+            print(
+                f"    defesa {opt.block_total}: cartas={list(opt.hand_cards)}, "
+                f"equip={list(opt.equipment)}"
+            )
         best, bad = options[0], options[-1]
         # +1{p} se qualquer carta usada for attack action (habilidade do herói).
         penalty_best = 1 if any(_is_attack_action(cards, k) for k in best.hand_cards) else 0
-        penalty_bad = 1 if any(_is_attack_action(cards, k) for k in bad.hand_cards) else 0
         link = ChainLink(attacker="B", card_key=name, total_damage=power)
         state.chain.append(link)
         for k in best.hand_cards:
             combat.defend_link(state, "A", [k], cards)
         for eq in best.equipment:
             combat.use_equipment_defense(state, "A", eq, cards)
-        result = combat.resolve_link(state, cards)
+        combat.resolve_link(state, cards)
         net = power + penalty_best - best.block_total
         a.life -= max(0, net)
-        print(f"    => jogou {list(best.hand_cards) or 'só equipamento'} "
-              f"(bloqueou {best.block_total}); dano real {max(0, net)}")
+        print(
+            f"    => jogou {list(best.hand_cards) or 'só equipamento'} "
+            f"(bloqueou {best.block_total}); dano real {max(0, net)}"
+        )
         diff = best.block_total - bad.block_total
-        print(f"    pior opção ({list(bad.hand_cards) or list(bad.equipment)}) "
-              f"bloquearia {bad.block_total} (dif. {diff:+d})")
+        print(
+            f"    pior opção ({list(bad.hand_cards) or list(bad.equipment)}) "
+            f"bloquearia {bad.block_total} (dif. {diff:+d})"
+        )
         print()
     print("Regra aplicada: se o bloqueio usasse attack action card, cada ataque")
     print("ganharia +1{p} (habilidade do herói) — por isso 'Clear Conscience' (3{d})\n")
@@ -136,8 +147,9 @@ def scenario_enigma_turn(cards):
     print("-" * 72)
     for line in run_bot_turn(state, "A", cards):
         print("  ", line)
-    print(f"-> Vida Boltyn: {state.players['B'].life}; "
-          f"auras/board Enigma: {state.players['A'].auras}")
+    print(
+        f"-> Vida Boltyn: {state.players['B'].life}; auras/board Enigma: {state.players['A'].auras}"
+    )
     print()
 
 
@@ -167,8 +179,7 @@ def scenario_phantasm(cards):
         and (vt.power or 0) + 3 >= 6
     )
     pop = is_phantasm_pop
-    print(f"Boltyn defende com Valiant Thrust (red) "
-          f"(power {vt.power}+3 = 7, tipos {vt.types}).")
+    print(f"Boltyn defende com Valiant Thrust (red) (power {vt.power}+3 = 7, tipos {vt.types}).")
     if pop:
         print("=> PHANTASM dispara (CR 8.3.13): Enigma Chimera é DESTRUÍDA e o")
         print("   ataque não resolve. Regra: não exponha Phantasm ao Valiant carregado.")
@@ -187,10 +198,11 @@ def scenario_phantasm(cards):
         print("  ", n.text)
     aura_key = next(k for k in state2.players["A"].auras if "Spectral Shield" in k)
     c_link = combat.attack_with_aura(state2, "A", aura_key, cards)
-    shield = cards[aura_key]
     print(f"Cosmo ataca com {aura_key} ({c_link.total_damage}p).")
-    print(f"  -> Aura NÃO tem Phantasm: o Valiant Thrust não pode destruí-la. "
-          f"Essa é a saída contra block grande.")
+    print(
+        "  -> Aura NÃO tem Phantasm: o Valiant Thrust não pode destruí-la. "
+        "Essa é a saída contra block grande."
+    )
 
 
 def main() -> None:

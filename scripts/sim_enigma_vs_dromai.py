@@ -22,10 +22,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from flesh_and_blood import combat
-from flesh_and_blood.attack import plan_enigma
 from flesh_and_blood.bot import run_bot_turn
 from flesh_and_blood.carddb import load_cards
 from flesh_and_blood.defense import suggest_defense
+from flesh_and_blood.heroes import plan_enigma
 from flesh_and_blood.models import ChainLink, Hero, new_game
 
 # Vida das alas (allies) da Dromai, do card.json (the-fab-cube). O modelo Card
@@ -54,10 +54,22 @@ COSMO = "Cosmo, Scroll of Ancestral Tapestry"
 
 def make_state():
     """Estado base: Enigma (A) vs Dromai (B), com equipamento e arma da Enigma."""
-    enigma = Hero(key="Enigma", name="Enigma", life=20, intellect=4,
-                  classes=("Illusionist",), talents=("Mystic",))
-    dromai = Hero(key="Dromai", name="Dromai", life=20, intellect=4,
-                  classes=("Illusionist",), talents=("Draconic",))
+    enigma = Hero(
+        key="Enigma",
+        name="Enigma",
+        life=20,
+        intellect=4,
+        classes=("Illusionist",),
+        talents=("Mystic",),
+    )
+    dromai = Hero(
+        key="Dromai",
+        name="Dromai",
+        life=20,
+        intellect=4,
+        classes=("Illusionist",),
+        talents=("Draconic",),
+    )
     state = new_game(enigma, dromai, first_player="A")
     combat.start_turn(state, "A")
     a = state.players["A"]
@@ -86,8 +98,9 @@ def scenario_enigma_turn(cards):
     print("-" * 70)
     for line in run_bot_turn(state, "A", cards):
         print("  ", line)
-    print(f"-> Vida Dromai: {state.players['B'].life}; "
-          f"auras/board Enigma: {state.players['A'].auras}")
+    print(
+        f"-> Vida Dromai: {state.players['B'].life}; auras/board Enigma: {state.players['A'].auras}"
+    )
     print()
 
 
@@ -122,11 +135,12 @@ def scenario_dromai_wave(cards):
         options = suggest_defense(power, hand, equip, top=3)
         print(f"{name} ({power}p + {arcane} arcano) — opções:")
         for opt in options:
-            print(f"    defesa {opt.block_total}: cartas={list(opt.hand_cards)}, "
-                  f"equip={list(opt.equipment)}")
+            print(
+                f"    defesa {opt.block_total}: cartas={list(opt.hand_cards)}, "
+                f"equip={list(opt.equipment)}"
+            )
         best = options[0]
-        link = ChainLink(attacker="B", card_key=name, total_damage=power,
-                         arcane_damage=arcane)
+        link = ChainLink(attacker="B", card_key=name, total_damage=power, arcane_damage=arcane)
         state.chain.append(link)
         for k in best.hand_cards:
             combat.defend_link(state, "A", [k], cards)
@@ -134,9 +148,11 @@ def scenario_dromai_wave(cards):
         for eq in best.equipment:
             combat.use_equipment_defense(state, "A", eq, cards)
         result = combat.resolve_link(state, cards, arcane_prevented=arcane)
-        print(f"    => jogou {list(best.hand_cards) or 'só equipamento'}; "
-              f"físico {result['physical']} / arcano {result['arcane']} "
-              f"| vida Enigma: {state.players['A'].life}")
+        print(
+            f"    => jogou {list(best.hand_cards) or 'só equipamento'}; "
+            f"físico {result['physical']} / arcano {result['arcane']} "
+            f"| vida Enigma: {state.players['A'].life}"
+        )
         print()
 
     print("Observação: bloquear os 3 dragões custa a mão + peças de armadura; o")

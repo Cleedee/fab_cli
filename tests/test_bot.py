@@ -3,9 +3,9 @@
 import pytest
 
 from flesh_and_blood import combat as cmb
-from flesh_and_blood.attack import plan_enigma
 from flesh_and_blood.bot import choose_bot_defense, run_bot_turn
 from flesh_and_blood.carddb import load_cards
+from flesh_and_blood.heroes import plan_enigma
 from flesh_and_blood.models import Hero, new_game
 
 BRIAR = Hero(
