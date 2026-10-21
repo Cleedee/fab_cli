@@ -49,7 +49,8 @@ Você só pode usar **1 carta da mão**. Some tudo o mais:
 Fontes:
 - **Carta da mão:** `Test of Strength` (4{d}), `On the Horizon` (4{d}),
   `Big Blue Sky` (2{d}+1 por blue pitchado), attack actions (3{d}).
-- **Equipamento:** `Blade Beckoner Plating`/`Helm` (1{d} cada),
+- **Equipamento:** `Blade Beckoner Plating`/`Helm` (1{d} cada contra attack
+  action — **2{d}** se for um ataque de arma, como `Titan's Fist`),
   `Unyielding Grip` (+3{d} se mão vazia).
 - **Ward:** cada aura destruída previne **1** (o ward base — CR 8.3.20). Os
   contadores `+1{p}` (Manifestations +3, Etchings +3) aumentam o **ataque** do
@@ -105,8 +106,8 @@ de crush, não gaste como bloco comum.
 | Slot | Cartas | Nota |
 |---|---|---|
 | Arma | `Cosmo` (2H) | Obrigatório. |
-| Cabeça | `Blade Beckoner Helm` | 1{d} vs weapon; **evite `Nullrune Hood`** (arcano inútil). |
-| Peito | `Blade Beckoner Plating` | 1{d} vs weapon. |
+| Cabeça | `Blade Beckoner Helm` | **2{d} vs arma** (base 1, +1{d} contra weapon attack); **evite `Nullrune Hood`** (arcano inútil, 0{d}). |
+| Peito | `Blade Beckoner Plating` | **2{d} vs arma** (mesma regra). |
 | Braços | `Unyielding Grip` | +3{d} com mão vazia (pós-ataque). |
 | Pernas | **`Unflinching Foothold`** | **Anti-Dominate** — a peça-chave da matchup. |
 | Extra | `Skycrest Keikoi`, `Uphold Tradition` | Prevenção 1 / põe +1{p} num aura ward (ataque). |
