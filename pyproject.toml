@@ -10,13 +10,16 @@ dev = ["pytest>=8.0", "ruff>=0.6"]
 
 [project.scripts]
 fab = "flesh_and_blood.cli:main"
+build-cards = "scripts.build_cards:main"
+fetch-decklist = "scripts.fetch_decklist:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src", "."]
+include = ["flesh_and_blood*", "scripts*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
